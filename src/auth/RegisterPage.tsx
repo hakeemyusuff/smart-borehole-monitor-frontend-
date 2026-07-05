@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { api, ApiError } from "@/lib/api"
 import type { RegisterRequest, UserPublic } from "@/lib/types"
+import { Logo } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -40,7 +41,8 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="min-h-svh flex items-center justify-center p-4">
+    <div className="min-h-svh flex flex-col items-center justify-center gap-8 p-4 py-12">
+      <Logo size="lg" />
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Create your account</CardTitle>

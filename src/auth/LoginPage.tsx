@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { api, ApiError } from "@/lib/api"
 import type { TokenResponse } from "@/lib/types"
 import { useAuth } from "@/auth/useAuth"
+import { Logo } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -45,10 +46,11 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-svh flex items-center justify-center p-4">
+    <div className="min-h-svh flex flex-col items-center justify-center gap-8 p-4">
+      <Logo size="lg" />
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign in to BoreSense</CardTitle>
+          <CardTitle>Sign in</CardTitle>
           <CardDescription>Enter your credentials to access your locations.</CardDescription>
         </CardHeader>
         <form onSubmit={onSubmit}>
