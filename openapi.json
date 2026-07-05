@@ -1,0 +1,1233 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BoreSense",
+    "description": "IoT-based real-time groundwater level monitoring and pump scheduling system.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register",
+        "operationId": "register_api_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_UserPublic_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_login_api_auth_login_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TokenResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/locations/": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "List All",
+        "operationId": "list_all_api_locations__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_Location__"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "OAuth2PasswordBearer": [] }]
+      },
+      "post": {
+        "tags": ["Locations"],
+        "summary": "Create",
+        "operationId": "create_api_locations__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LocationCreate" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Location_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "OAuth2PasswordBearer": [] }]
+      }
+    },
+    "/api/locations/{location_id}": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "Retrieve",
+        "operationId": "retrieve_api_locations__location_id__get",
+        "security": [{ "OAuth2PasswordBearer": [] }],
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Location Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Location_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/boreholes/": {
+      "get": {
+        "tags": ["Boreholes"],
+        "summary": "List All",
+        "operationId": "list_all_api_boreholes__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_Borehole__"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "OAuth2PasswordBearer": [] }]
+      },
+      "post": {
+        "tags": ["Boreholes"],
+        "summary": "Create",
+        "operationId": "create_api_boreholes__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BoreholeCreate" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Borehole_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "OAuth2PasswordBearer": [] }]
+      }
+    },
+    "/api/boreholes/{borehole_id}": {
+      "get": {
+        "tags": ["Boreholes"],
+        "summary": "Retrieve",
+        "operationId": "retrieve_api_boreholes__borehole_id__get",
+        "security": [{ "OAuth2PasswordBearer": [] }],
+        "parameters": [
+          {
+            "name": "borehole_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Borehole Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Borehole_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sensors/": {
+      "post": {
+        "tags": ["Sensors"],
+        "summary": "Create",
+        "operationId": "create_api_sensors__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SensorCreate" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_SensorCreateResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        },
+        "security": [{ "OAuth2PasswordBearer": [] }]
+      }
+    },
+    "/api/sensors/boreholes/{borehole_id}": {
+      "get": {
+        "tags": ["Sensors"],
+        "summary": "List Sensors Under Borehole",
+        "operationId": "list_sensors_under_borehole_api_sensors_boreholes__borehole_id__get",
+        "security": [{ "OAuth2PasswordBearer": [] }],
+        "parameters": [
+          {
+            "name": "borehole_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Borehole Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_SensorPublic__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sensors/{sensor_id}": {
+      "get": {
+        "tags": ["Sensors"],
+        "summary": "Retrieve",
+        "operationId": "retrieve_api_sensors__sensor_id__get",
+        "security": [{ "OAuth2PasswordBearer": [] }],
+        "parameters": [
+          {
+            "name": "sensor_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Sensor Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_SensorPublic_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sensors/readings/water-level": {
+      "post": {
+        "tags": ["Sensors"],
+        "summary": "Ingest Water Level",
+        "operationId": "ingest_water_level_api_sensors_readings_water_level_post",
+        "parameters": [
+          {
+            "name": "x-device-id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "integer", "title": "X-Device-Id" }
+          },
+          {
+            "name": "x-device-key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Device-Key" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReadingIn" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sensors/readings/water-level/{borehole_id}/{sensor_id}": {
+      "get": {
+        "tags": ["Sensors"],
+        "summary": "List All Water Level Readings",
+        "operationId": "list_all_water_level_readings_api_sensors_readings_water_level__borehole_id___sensor_id__get",
+        "security": [{ "OAuth2PasswordBearer": [] }],
+        "parameters": [
+          {
+            "name": "sensor_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Sensor Id" }
+          },
+          {
+            "name": "borehole_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Borehole Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_WaterLevelReading__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sensors/readings/flow-reading": {
+      "post": {
+        "tags": ["Sensors"],
+        "summary": "Ingest Flow Reading",
+        "operationId": "ingest_flow_reading_api_sensors_readings_flow_reading_post",
+        "parameters": [
+          {
+            "name": "x-device-id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "integer", "title": "X-Device-Id" }
+          },
+          {
+            "name": "x-device-key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Device-Key" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReadingIn" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sensors/readings/flow-reading/{borehole_id}/{sensor_id}": {
+      "get": {
+        "tags": ["Sensors"],
+        "summary": "List All Flow Readings",
+        "operationId": "list_all_flow_readings_api_sensors_readings_flow_reading__borehole_id___sensor_id__get",
+        "security": [{ "OAuth2PasswordBearer": [] }],
+        "parameters": [
+          {
+            "name": "sensor_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Sensor Id" }
+          },
+          {
+            "name": "borehole_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Borehole Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_FlowReading__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/weathers/fetch/{location_id}": {
+      "post": {
+        "tags": ["Weathers"],
+        "summary": "Trigger Weather Fetch",
+        "operationId": "trigger_weather_fetch_api_weathers_fetch__location_id__post",
+        "security": [{ "OAuth2PasswordBearer": [] }],
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Location Id" }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Weather_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/weathers/{location_id}": {
+      "get": {
+        "tags": ["Weathers"],
+        "summary": "List All",
+        "operationId": "list_all_api_weathers__location_id__get",
+        "security": [{ "OAuth2PasswordBearer": [] }],
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Location Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_Weather__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiResponse": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": { "anyOf": [{}, { "type": "null" }], "title": "Data" }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse"
+      },
+      "ApiResponse_Borehole_": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/Borehole" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[Borehole]"
+      },
+      "ApiResponse_Location_": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/Location" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[Location]"
+      },
+      "ApiResponse_SensorCreateResponse_": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/SensorCreateResponse" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[SensorCreateResponse]"
+      },
+      "ApiResponse_SensorPublic_": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/SensorPublic" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[SensorPublic]"
+      },
+      "ApiResponse_TokenResponse_": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/TokenResponse" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[TokenResponse]"
+      },
+      "ApiResponse_UserPublic_": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/UserPublic" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[UserPublic]"
+      },
+      "ApiResponse_Weather_": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/Weather" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[Weather]"
+      },
+      "ApiResponse_list_Borehole__": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/Borehole" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[list[Borehole]]"
+      },
+      "ApiResponse_list_FlowReading__": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/FlowReading" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[list[FlowReading]]"
+      },
+      "ApiResponse_list_Location__": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/Location" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[list[Location]]"
+      },
+      "ApiResponse_list_SensorPublic__": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/SensorPublic" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[list[SensorPublic]]"
+      },
+      "ApiResponse_list_WaterLevelReading__": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/WaterLevelReading" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[list[WaterLevelReading]]"
+      },
+      "ApiResponse_list_Weather__": {
+        "properties": {
+          "status": { "type": "string", "title": "Status" },
+          "message": { "type": "string", "title": "Message" },
+          "data": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/Weather" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": ["status", "message"],
+        "title": "ApiResponse[list[Weather]]"
+      },
+      "Body_login_api_auth_login_post": {
+        "properties": {
+          "grant_type": {
+            "anyOf": [
+              { "type": "string", "pattern": "^password$" },
+              { "type": "null" }
+            ],
+            "title": "Grant Type"
+          },
+          "username": { "type": "string", "title": "Username" },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "title": "Password"
+          },
+          "scope": { "type": "string", "title": "Scope", "default": "" },
+          "client_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "format": "password",
+            "title": "Client Secret"
+          }
+        },
+        "type": "object",
+        "required": ["username", "password"],
+        "title": "Body_login_api_auth_login_post"
+      },
+      "Borehole": {
+        "properties": {
+          "id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Id"
+          },
+          "name": { "type": "string", "title": "Name" },
+          "total_depth": { "type": "number", "title": "Total Depth" },
+          "location_id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Location Id"
+          },
+          "critical_low_level": {
+            "type": "number",
+            "title": "Critical Low Level"
+          },
+          "optimal_high_level": {
+            "type": "number",
+            "title": "Optimal High Level"
+          },
+          "soil_characteristic": {
+            "type": "string",
+            "title": "Soil Characteristic"
+          },
+          "water_body_proximity": {
+            "type": "number",
+            "title": "Water Body Proximity"
+          },
+          "topography": { "type": "string", "title": "Topography" },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "total_depth",
+          "critical_low_level",
+          "optimal_high_level",
+          "soil_characteristic",
+          "water_body_proximity",
+          "topography"
+        ],
+        "title": "Borehole"
+      },
+      "BoreholeCreate": {
+        "properties": {
+          "name": { "type": "string", "title": "Name" },
+          "total_depth": { "type": "number", "title": "Total Depth" },
+          "location_id": { "type": "integer", "title": "Location Id" },
+          "critical_low_level": {
+            "type": "number",
+            "title": "Critical Low Level"
+          },
+          "optimal_high_level": {
+            "type": "number",
+            "title": "Optimal High Level"
+          },
+          "soil_characteristic": {
+            "type": "string",
+            "title": "Soil Characteristic"
+          },
+          "water_body_proximity": {
+            "type": "number",
+            "title": "Water Body Proximity"
+          },
+          "topography": { "type": "string", "title": "Topography" }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "total_depth",
+          "location_id",
+          "critical_low_level",
+          "optimal_high_level",
+          "soil_characteristic",
+          "water_body_proximity",
+          "topography"
+        ],
+        "title": "BoreholeCreate"
+      },
+      "FlowReading": {
+        "properties": {
+          "id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Id"
+          },
+          "borehole_id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Borehole Id"
+          },
+          "sensor_id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Sensor Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "raw_reading": { "type": "number", "title": "Raw Reading" },
+          "calculated_flow_rate": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Calculated Flow Rate"
+          },
+          "cummulative_volume": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Cummulative Volume"
+          }
+        },
+        "type": "object",
+        "required": ["raw_reading"],
+        "title": "FlowReading"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": { "$ref": "#/components/schemas/ValidationError" },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Location": {
+        "properties": {
+          "id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Id"
+          },
+          "name": { "type": "string", "title": "Name" },
+          "user_id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "User Id"
+          },
+          "latitude": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Longitude"
+          }
+        },
+        "type": "object",
+        "required": ["name"],
+        "title": "Location"
+      },
+      "LocationCreate": {
+        "properties": {
+          "name": { "type": "string", "title": "Name" },
+          "latitude": { "type": "number", "title": "Latitude" },
+          "longitude": { "type": "number", "title": "Longitude" }
+        },
+        "type": "object",
+        "required": ["name", "latitude", "longitude"],
+        "title": "LocationCreate"
+      },
+      "ReadingIn": {
+        "properties": {
+          "sensor_id": { "type": "integer", "title": "Sensor Id" },
+          "reading": { "type": "number", "title": "Reading" }
+        },
+        "type": "object",
+        "required": ["sensor_id", "reading"],
+        "title": "ReadingIn"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "email": { "type": "string", "format": "email", "title": "Email" },
+          "title": { "type": "string", "title": "Title" },
+          "first_name": { "type": "string", "title": "First Name" },
+          "last_name": { "type": "string", "title": "Last Name" },
+          "password": { "type": "string", "title": "Password" }
+        },
+        "type": "object",
+        "required": ["email", "title", "first_name", "last_name", "password"],
+        "title": "RegisterRequest"
+      },
+      "SensorCreate": {
+        "properties": {
+          "borehole_id": { "type": "integer", "title": "Borehole Id" },
+          "type": { "$ref": "#/components/schemas/SensorType" }
+        },
+        "type": "object",
+        "required": ["borehole_id", "type"],
+        "title": "SensorCreate"
+      },
+      "SensorCreateResponse": {
+        "properties": {
+          "sensor": { "$ref": "#/components/schemas/SensorPublic" },
+          "device_key": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Device Key"
+          }
+        },
+        "type": "object",
+        "required": ["sensor"],
+        "title": "SensorCreateResponse"
+      },
+      "SensorPublic": {
+        "properties": {
+          "borehole_id": { "type": "integer", "title": "Borehole Id" },
+          "type": { "$ref": "#/components/schemas/SensorType" },
+          "id": { "type": "integer", "title": "Id" },
+          "status": { "$ref": "#/components/schemas/SensorStatus" },
+          "last_seen": {
+            "anyOf": [
+              { "type": "string", "format": "date-time" },
+              { "type": "null" }
+            ],
+            "title": "Last Seen"
+          }
+        },
+        "type": "object",
+        "required": ["borehole_id", "type", "id", "status"],
+        "title": "SensorPublic"
+      },
+      "SensorStatus": {
+        "type": "string",
+        "enum": ["active", "inactive", "faulty"],
+        "title": "SensorStatus"
+      },
+      "SensorType": {
+        "type": "string",
+        "enum": ["pressure_transducer", "flow_meter", "esp32"],
+        "title": "SensorType"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": { "type": "string", "title": "Access Token" },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": ["access_token"],
+        "title": "TokenResponse"
+      },
+      "UserPublic": {
+        "properties": {
+          "email": { "type": "string", "format": "email", "title": "Email" },
+          "first_name": { "type": "string", "title": "First Name" },
+          "last_name": { "type": "string", "title": "Last Name" },
+          "title": { "type": "string", "title": "Title" },
+          "id": { "type": "integer", "title": "Id" }
+        },
+        "type": "object",
+        "required": ["email", "first_name", "last_name", "title", "id"],
+        "title": "UserPublic"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": { "anyOf": [{ "type": "string" }, { "type": "integer" }] },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": { "type": "string", "title": "Message" },
+          "type": { "type": "string", "title": "Error Type" },
+          "input": { "title": "Input" },
+          "ctx": { "type": "object", "title": "Context" }
+        },
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError"
+      },
+      "WaterLevelReading": {
+        "properties": {
+          "id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Id"
+          },
+          "borehole_id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Borehole Id"
+          },
+          "sensor_id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Sensor Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "water_level": { "type": "number", "title": "Water Level" },
+          "calculated_water_depth": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Calculated Water Depth"
+          }
+        },
+        "type": "object",
+        "required": ["water_level"],
+        "title": "WaterLevelReading"
+      },
+      "Weather": {
+        "properties": {
+          "id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Id"
+          },
+          "location_id": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Location Id"
+          },
+          "temperature": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Temperature"
+          },
+          "humidity": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Humidity"
+          },
+          "precipitation": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Precipitation"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "title": "Weather"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": { "password": { "scopes": {}, "tokenUrl": "/auth/login" } }
+      }
+    }
+  }
+}
