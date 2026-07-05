@@ -46,9 +46,9 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-svh flex flex-col items-center justify-center gap-8 p-4">
+    <div className="min-h-svh flex flex-col items-center justify-center gap-10 p-4">
       <Logo size="lg" />
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md shadow-2xl shadow-black/40">
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
           <CardDescription>Enter your credentials to access your locations.</CardDescription>

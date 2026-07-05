@@ -3,7 +3,7 @@ type LogoSize = "sm" | "md" | "lg"
 const SIZES: Record<LogoSize, { mark: number; text: string; gap: string }> = {
   sm: { mark: 20, text: "text-lg", gap: "gap-2" },
   md: { mark: 26, text: "text-xl", gap: "gap-2.5" },
-  lg: { mark: 34, text: "text-2xl", gap: "gap-3" },
+  lg: { mark: 40, text: "text-3xl", gap: "gap-3.5" },
 }
 
 export function Logo({ size = "md" }: { size?: LogoSize }) {

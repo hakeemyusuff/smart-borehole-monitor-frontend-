@@ -41,9 +41,9 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="min-h-svh flex flex-col items-center justify-center gap-8 p-4 py-12">
+    <div className="min-h-svh flex flex-col items-center justify-center gap-10 p-4 py-12">
       <Logo size="lg" />
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md shadow-2xl shadow-black/40">
         <CardHeader>
           <CardTitle>Create your account</CardTitle>
           <CardDescription>Register to start monitoring your boreholes.</CardDescription>
