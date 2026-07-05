@@ -45,21 +45,29 @@ async function request<T>(path: string, opts: ApiFetchOptions = {}): Promise<T> 
     body: finalBody,
   })
 
-  if (res.status === 401) {
+  const contentType = res.headers.get("content-type") ?? ""
+  const payload = contentType.includes("application/json")
+    ? ((await res.json()) as ApiResponse<T> & { detail?: string })
+    : null
+
+  // A 401 from an authenticated request means the session died mid-flight —
+  // clear the token and bounce to /login. A 401 from an unauthenticated
+  // request (login/register) is just "wrong credentials" and must surface
+  // the backend's real message instead of the session-expired copy.
+  if (res.status === 401 && auth) {
     clearToken()
     if (window.location.pathname !== "/login") {
       window.location.assign("/login")
     }
-    throw new ApiError("Session expired. Please log in again.", 401)
+    throw new ApiError(
+      payload?.message ?? "Session expired. Please log in again.",
+      401,
+    )
   }
 
-  const contentType = res.headers.get("content-type") ?? ""
-  const payload = contentType.includes("application/json")
-    ? ((await res.json()) as ApiResponse<T>)
-    : null
-
   if (!res.ok) {
-    const message = payload?.message ?? `Request failed with ${res.status}`
+    const message =
+      payload?.message ?? payload?.detail ?? `Request failed with ${res.status}`
     throw new ApiError(message, res.status)
   }
 
