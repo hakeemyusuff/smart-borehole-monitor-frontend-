@@ -1,8 +1,8 @@
 import { Link, useParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { useLocation } from "@/locations/queries"
+import { BoreholesPanel } from "@/boreholes/BoreholesPanel"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function LocationDetailPage() {
@@ -56,27 +56,17 @@ export function LocationDetailPage() {
             <h1 className="text-5xl font-medium">{query.data.name}</h1>
           </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Metric label="Latitude" value={query.data.latitude?.toFixed(4) ?? "—"} />
             <Metric label="Longitude" value={query.data.longitude?.toFixed(4) ?? "—"} />
-            <Metric
-              label="Boreholes"
-              value="Coming soon"
-              muted
-            />
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-heading text-xl">Boreholes at this site</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Borehole management arrives in the next step. This panel will list every borehole
-                registered under {query.data.name}.
-              </p>
-            </CardContent>
-          </Card>
+          {query.data.id !== null && query.data.id !== undefined && (
+            <BoreholesPanel
+              locationId={query.data.id}
+              locationName={query.data.name}
+            />
+          )}
         </div>
       )}
     </section>
