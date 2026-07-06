@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom"
 import type { SensorPublic, SensorStatus, SensorType } from "@/lib/types"
 import { ApiError } from "@/lib/api"
 import { useSensorsForBorehole } from "@/sensors/queries"
@@ -49,7 +50,12 @@ function SensorsList({ sensors }: { sensors: SensorPublic[] }) {
           className="animate-in fade-in slide-in-from-bottom-1 duration-500"
           style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
         >
-          <SensorRow sensor={s} />
+          <Link
+            to={`/boreholes/${s.borehole_id}/sensors/${s.id}`}
+            className="group block focus-visible:outline-none"
+          >
+            <SensorRow sensor={s} />
+          </Link>
         </div>
       ))}
     </div>
@@ -59,7 +65,7 @@ function SensorsList({ sensors }: { sensors: SensorPublic[] }) {
 function SensorRow({ sensor }: { sensor: SensorPublic }) {
   const meta = sensorMeta(sensor.type)
   return (
-    <Card className="w-full">
+    <Card className="w-full transition-[transform,box-shadow,border-color] duration-200 will-change-transform group-hover:scale-[1.01] group-hover:border-primary/50 group-hover:shadow-md group-hover:shadow-black/25 group-focus-visible:border-primary/60 group-focus-visible:ring-2 group-focus-visible:ring-ring/40">
       <CardContent className="flex items-center justify-between gap-4 py-4">
         <div className="flex items-center gap-4 min-w-0">
           <SensorMark type={sensor.type} />

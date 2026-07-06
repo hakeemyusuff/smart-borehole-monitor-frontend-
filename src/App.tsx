@@ -6,6 +6,7 @@ import { AppLayout } from "@/components/AppLayout"
 import { LocationsPage } from "@/locations/LocationsPage"
 import { LocationDetailPage } from "@/locations/LocationDetailPage"
 import { BoreholeDetailPage } from "@/boreholes/BoreholeDetailPage"
+import { SensorDetailPage } from "@/sensors/SensorDetailPage"
 
 function App() {
   return (
@@ -18,6 +19,10 @@ function App() {
           <Route path="/locations" element={<LocationsPage />} />
           <Route path="/locations/:id" element={<LocationDetailPage />} />
           <Route path="/boreholes/:id" element={<BoreholeDetailPage />} />
+          <Route
+            path="/boreholes/:boreholeId/sensors/:sensorId"
+            element={<SensorDetailPage />}
+          />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

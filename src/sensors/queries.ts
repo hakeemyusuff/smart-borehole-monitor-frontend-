@@ -24,6 +24,15 @@ export function useSensorsForBorehole(boreholeId: number | undefined) {
   })
 }
 
+export function useSensor(id: number | undefined) {
+  return useQuery({
+    queryKey:
+      id !== undefined ? sensorsKeys.detail(id) : ["sensors", "unknown"],
+    queryFn: () => api.get<SensorPublic>(`/api/sensors/${id}`),
+    enabled: id !== undefined,
+  })
+}
+
 export function useCreateSensor(boreholeId: number) {
   const qc = useQueryClient()
   return useMutation({
