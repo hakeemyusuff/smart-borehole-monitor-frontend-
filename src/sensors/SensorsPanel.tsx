@@ -2,6 +2,7 @@ import type { SensorPublic, SensorStatus, SensorType } from "@/lib/types"
 import { ApiError } from "@/lib/api"
 import { useSensorsForBorehole } from "@/sensors/queries"
 import { NewSensorDialog } from "@/sensors/NewSensorDialog"
+import { sensorMeta } from "@/sensors/sensor-types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,25 +56,25 @@ function SensorsList({ sensors }: { sensors: SensorPublic[] }) {
   )
 }
 
-const TYPE_LABEL: Record<SensorType, string> = {
-  pressure_transducer: "Pressure transducer",
-  flow_meter: "Flow meter",
-  esp32: "ESP32 controller",
-}
-
 function SensorRow({ sensor }: { sensor: SensorPublic }) {
+  const meta = sensorMeta(sensor.type)
   return (
-    <Card>
+    <Card className="w-full">
       <CardContent className="flex items-center justify-between gap-4 py-4">
         <div className="flex items-center gap-4 min-w-0">
           <SensorMark type={sensor.type} />
           <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="font-heading text-lg truncate">
-              {TYPE_LABEL[sensor.type]}
-            </span>
-            <span className="text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
-              id #{sensor.id}
-              {sensor.last_seen && ` · last seen ${formatWhen(sensor.last_seen)}`}
+            <span className="font-heading text-lg truncate">{meta.label}</span>
+            <span className="text-xs text-muted-foreground truncate">
+              {meta.hint}
+              {sensor.last_seen && (
+                <>
+                  {" · "}
+                  <span className="[font-variant-numeric:tabular-nums]">
+                    last seen {formatWhen(sensor.last_seen)}
+                  </span>
+                </>
+              )}
             </span>
           </div>
         </div>

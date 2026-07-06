@@ -71,7 +71,7 @@ function BoreholeRow({ borehole }: { borehole: Borehole }) {
       to={hasId ? `/boreholes/${borehole.id}` : "#"}
       className="group block focus-visible:outline-none"
     >
-      <Card className="transition-[transform,box-shadow,border-color] duration-200 will-change-transform group-hover:scale-[1.01] group-hover:border-primary/50 group-hover:shadow-md group-hover:shadow-black/25 group-focus-visible:border-primary/60 group-focus-visible:ring-2 group-focus-visible:ring-ring/40">
+      <Card className="w-full transition-[transform,box-shadow,border-color] duration-200 will-change-transform group-hover:scale-[1.01] group-hover:border-primary/50 group-hover:shadow-md group-hover:shadow-black/25 group-focus-visible:border-primary/60 group-focus-visible:ring-2 group-focus-visible:ring-ring/40">
         <CardContent className="flex items-center justify-between gap-6 py-4">
           <div className="flex items-center gap-4 min-w-0">
             <BoreholeMark depth={borehole.total_depth} />

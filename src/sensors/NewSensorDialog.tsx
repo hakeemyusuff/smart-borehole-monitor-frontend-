@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import type { SensorType } from "@/lib/types"
 import { useCreateSensor } from "@/sensors/queries"
+import { SENSOR_TYPES, sensorMeta } from "@/sensors/sensor-types"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -21,24 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-
-const SENSOR_TYPES: { value: SensorType; label: string; hint: string }[] = [
-  {
-    value: "pressure_transducer",
-    label: "Pressure transducer",
-    hint: "Measures water level via hydrostatic pressure.",
-  },
-  {
-    value: "flow_meter",
-    label: "Flow meter",
-    hint: "Measures pumped or recharged volume.",
-  },
-  {
-    value: "esp32",
-    label: "ESP32 controller",
-    hint: "Wi-Fi bridge that reports on behalf of physical probes.",
-  },
-]
 
 export function NewSensorDialog({
   boreholeId,
@@ -71,7 +54,7 @@ export function NewSensorDialog({
             setDeviceKey(res.device_key)
             toast.success("Sensor registered — copy the device key")
           } else {
-            toast.success(`${labelFor(res.sensor.type)} registered`)
+            toast.success(`${sensorMeta(res.sensor.type).label} registered`)
             setOpen(false)
             reset()
           }
@@ -131,7 +114,7 @@ export function NewSensorDialog({
               </Select>
               {type && (
                 <p className="text-xs text-muted-foreground">
-                  {SENSOR_TYPES.find((s) => s.value === type)?.hint}
+                  {sensorMeta(type).hint}
                 </p>
               )}
             </div>
@@ -212,6 +195,3 @@ function DeviceKeyDialog({
   )
 }
 
-function labelFor(type: SensorType): string {
-  return SENSOR_TYPES.find((s) => s.value === type)?.label ?? "Sensor"
-}
