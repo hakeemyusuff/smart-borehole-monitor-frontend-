@@ -71,7 +71,7 @@ export function NewLocationDialog({ trigger }: { trigger: ReactNode }) {
             A location is a site on a map. Boreholes live inside it.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <form onSubmit={onSubmit} className="flex flex-col gap-5 py-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="loc-name">Name</Label>
             <Input

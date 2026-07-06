@@ -48,7 +48,7 @@ export function LocationDetailPage() {
       )}
 
       {query.data && (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-1 duration-500">
           <header className="flex flex-col gap-1">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               Location

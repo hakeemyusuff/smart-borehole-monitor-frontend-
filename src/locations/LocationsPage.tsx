@@ -33,8 +33,14 @@ export function LocationsPage() {
 function LocationsGrid({ locations }: { locations: Location[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {locations.map((loc) => (
-        <LocationCard key={loc.id ?? loc.name} location={loc} />
+      {locations.map((loc, i) => (
+        <div
+          key={loc.id ?? loc.name}
+          className="animate-in fade-in slide-in-from-bottom-2 duration-500"
+          style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}
+        >
+          <LocationCard location={loc} />
+        </div>
       ))}
     </div>
   )
@@ -50,9 +56,9 @@ function LocationCard({ location }: { location: Location }) {
   return (
     <Link
       to={location.id !== null && location.id !== undefined ? `/locations/${location.id}` : "#"}
-      className="group focus-visible:outline-none"
+      className="group block focus-visible:outline-none"
     >
-      <Card className="h-full transition-[transform,box-shadow,border-color] duration-200 group-hover:border-primary/40 group-hover:shadow-lg group-hover:shadow-black/30 group-focus-visible:border-primary/60 group-focus-visible:ring-2 group-focus-visible:ring-ring/40">
+      <Card className="h-full transition-[transform,box-shadow,border-color] duration-200 will-change-transform group-hover:scale-[1.02] group-hover:border-primary/50 group-hover:shadow-lg group-hover:shadow-black/30 group-focus-visible:border-primary/60 group-focus-visible:ring-2 group-focus-visible:ring-ring/40">
         <CardHeader>
           <CardTitle className="font-heading text-2xl font-medium">
             {location.name}
@@ -91,7 +97,7 @@ function LocationsSkeletonGrid() {
 
 function LocationsEmpty() {
   return (
-    <div className="border border-dashed border-border rounded-xl p-10 flex flex-col items-center text-center gap-4 bg-card/40">
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-400 border border-dashed border-border rounded-xl p-10 flex flex-col items-center text-center gap-4 bg-card/40">
       <BoreholeGlyph />
       <div className="flex flex-col gap-1 max-w-sm">
         <h2 className="text-2xl">No locations yet</h2>
