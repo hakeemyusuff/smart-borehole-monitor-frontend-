@@ -56,7 +56,7 @@ export function LocationDetailPage() {
             <h1 className="text-5xl font-medium">{query.data.name}</h1>
           </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
             <Metric label="Latitude" value={query.data.latitude?.toFixed(4) ?? "—"} />
             <Metric label="Longitude" value={query.data.longitude?.toFixed(4) ?? "—"} />
           </div>
@@ -83,12 +83,12 @@ function Metric({
   muted?: boolean
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+    <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-1 min-w-0">
+      <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground truncate">
         {label}
       </span>
       <span
-        className={`text-2xl [font-variant-numeric:tabular-nums] ${
+        className={`text-2xl [font-variant-numeric:tabular-nums] truncate ${
           muted ? "text-muted-foreground" : "text-foreground"
         }`}
       >

@@ -69,7 +69,7 @@ export function BoreholeDetailPage() {
             </p>
           </header>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 min-w-0">
             <Metric
               label="Total depth"
               value={query.data.total_depth}
@@ -114,11 +114,11 @@ function Metric({
   subLabel?: string
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-1 min-w-0">
+      <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground truncate">
         {label}
       </span>
-      <span className="text-2xl [font-variant-numeric:tabular-nums] text-foreground">
+      <span className="text-2xl [font-variant-numeric:tabular-nums] text-foreground truncate">
         {value}
         {unit && (
           <span className="text-muted-foreground text-base ml-1">{unit}</span>
