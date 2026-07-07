@@ -24,16 +24,15 @@ export function FlowChart({
 }) {
   const gradientId = useId()
 
-  const data = useMemo<Point[]>(
-    () =>
-      points
-        .map((p) => ({
-          t: new Date(p.t).getTime(),
-          value: p.value,
-        }))
-        .sort((a, b) => a.t - b.t),
-    [points],
-  )
+  const data = useMemo<Point[]>(() => {
+    const sorted = points
+      .map((p) => ({
+        t: new Date(p.t).getTime(),
+        value: p.value,
+      }))
+      .sort((a, b) => a.t - b.t)
+    return withGaps(sorted, GAP_MS[range])
+  }, [points, range])
 
   const yDomain = useMemo<[number, number]>(() => {
     const numeric = data
@@ -95,6 +94,7 @@ export function FlowChart({
             stroke="var(--primary)"
             strokeWidth={2}
             fill={`url(#${gradientId})`}
+            connectNulls={false}
             isAnimationActive
             animationDuration={600}
             dot={false}
@@ -118,6 +118,27 @@ export function FlowChart({
       </ResponsiveContainer>
     </div>
   )
+}
+
+// Gap threshold per range: consecutive points farther apart than this get a
+// null placeholder inserted so the area breaks visually (between-pumping idle).
+const GAP_MS: Record<ChartRange, number> = {
+  day: 5 * 60 * 1000,
+  week: 60 * 60 * 1000,
+  month: 6 * 60 * 60 * 1000,
+}
+
+function withGaps(points: Point[], threshold: number): Point[] {
+  if (points.length < 2) return points
+  const out: Point[] = []
+  for (let i = 0; i < points.length; i++) {
+    out.push(points[i])
+    const next = points[i + 1]
+    if (next && next.t - points[i].t > threshold) {
+      out.push({ t: (points[i].t + next.t) / 2, value: null })
+    }
+  }
+  return out
 }
 
 function formatTick(ts: number, range: ChartRange): string {

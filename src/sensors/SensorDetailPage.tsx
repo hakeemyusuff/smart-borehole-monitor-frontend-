@@ -167,7 +167,7 @@ function WaterLevelPanel({
   return (
     <Card className="w-full">
       <CardHeader className="flex flex-col gap-3">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="w-full flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0 flex flex-col gap-1">
             <CardTitle className="font-heading text-xl">Water level</CardTitle>
             <p className="text-xs text-muted-foreground">
@@ -210,7 +210,7 @@ function FlowPanel({
   return (
     <Card className="w-full">
       <CardHeader className="flex flex-col gap-3">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="w-full flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0 flex flex-col gap-1">
             <CardTitle className="font-heading text-xl">Flow</CardTitle>
             <p className="text-xs text-muted-foreground">
