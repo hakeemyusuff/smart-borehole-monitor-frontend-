@@ -3,6 +3,7 @@ import { LoginPage } from "@/auth/LoginPage"
 import { RegisterPage } from "@/auth/RegisterPage"
 import { ProtectedRoute } from "@/auth/ProtectedRoute"
 import { AppLayout } from "@/components/AppLayout"
+import { DashboardPage } from "@/dashboard/DashboardPage"
 import { LocationsPage } from "@/locations/LocationsPage"
 import { LocationDetailPage } from "@/locations/LocationDetailPage"
 import { BoreholeDetailPage } from "@/boreholes/BoreholeDetailPage"
@@ -15,7 +16,8 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/locations" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/locations" element={<LocationsPage />} />
           <Route path="/locations/:id" element={<LocationDetailPage />} />
           <Route path="/boreholes/:id" element={<BoreholeDetailPage />} />
