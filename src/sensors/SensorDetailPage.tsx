@@ -1,15 +1,17 @@
+import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { useBorehole } from "@/boreholes/queries"
 import { useSensor } from "@/sensors/queries"
-import { useFlowReadings, useWaterLevelReadings } from "@/readings/queries"
+import { useFlowChart, useWaterLevelChart } from "@/readings/queries"
 import { FlowChart } from "@/readings/FlowChart"
 import { WaterLevelChart } from "@/readings/WaterLevelChart"
 import { sensorMeta } from "@/sensors/sensor-types"
-import type { FlowReading, SensorPublic, SensorStatus } from "@/lib/types"
+import type { ChartPoint, ChartRange, SensorPublic, SensorStatus } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { RangeSelector } from "@/components/RangeSelector"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function SensorDetailPage() {
@@ -158,55 +160,37 @@ function WaterLevelPanel({
   criticalLow?: number
   optimalHigh?: number
 }) {
-  const waterQuery = useWaterLevelReadings(boreholeId, sensorId)
+  const [range, setRange] = useState<ChartRange>("day")
+  const chartQuery = useWaterLevelChart(boreholeId, sensorId, range)
+  const latest = latestNonNullValue(chartQuery.data)
+
   return (
     <Card className="w-full">
-      <CardHeader className="flex flex-row items-end justify-between gap-4 flex-wrap">
-        <div className="min-w-0">
-          <CardTitle className="font-heading text-xl">Water level</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            Readings from this sensor over time.
-          </p>
+      <CardHeader className="flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex flex-col gap-1">
+            <CardTitle className="font-heading text-xl">Water level</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Readings from this sensor over time.
+            </p>
+          </div>
+          {latest !== null && <LatestReadout value={latest} unit="m" />}
         </div>
-        {waterQuery.data && waterQuery.data.length > 0 && (
-          <LatestReadout
-            latest={waterQuery.data[waterQuery.data.length - 1].water_level}
-          />
-        )}
+        <RangeSelector value={range} onChange={setRange} />
       </CardHeader>
       <CardContent>
-        {waterQuery.isPending && <Skeleton className="h-72 w-full" />}
-        {waterQuery.isError && (
-          <div className="flex flex-col gap-3 items-start">
-            <p className="text-destructive text-sm">
-              {waterQuery.error instanceof ApiError
-                ? waterQuery.error.message
-                : "Couldn't load readings."}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => waterQuery.refetch()}
-            >
-              Try again
-            </Button>
-          </div>
-        )}
-        {waterQuery.data && waterQuery.data.length === 0 && (
-          <div className="h-72 flex items-center justify-center text-center">
-            <p className="text-muted-foreground text-sm max-w-xs">
-              No readings yet. Once the sensor comes online, its water-level readings will
-              appear here.
-            </p>
-          </div>
-        )}
-        {waterQuery.data && waterQuery.data.length > 0 && (
-          <WaterLevelChart
-            readings={waterQuery.data}
-            criticalLow={criticalLow}
-            optimalHigh={optimalHigh}
-          />
-        )}
+        <ChartArea
+          query={chartQuery}
+          emptyText="No readings for this window yet."
+          render={(points) => (
+            <WaterLevelChart
+              points={points}
+              range={range}
+              criticalLow={criticalLow}
+              optimalHigh={optimalHigh}
+            />
+          )}
+        />
       </CardContent>
     </Card>
   )
@@ -219,54 +203,77 @@ function FlowPanel({
   boreholeId: number
   sensorId: number
 }) {
-  const flowQuery = useFlowReadings(boreholeId, sensorId)
-  const latest =
-    flowQuery.data && flowQuery.data.length > 0
-      ? flowQuery.data[flowQuery.data.length - 1]
-      : undefined
+  const [range, setRange] = useState<ChartRange>("day")
+  const chartQuery = useFlowChart(boreholeId, sensorId, range)
+  const latest = latestNonNullValue(chartQuery.data)
 
   return (
     <Card className="w-full">
-      <CardHeader className="flex-row items-end justify-between gap-4 flex-wrap">
-        <div>
-          <CardTitle className="font-heading text-xl">Flow</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            Pulse-count readings from this flow meter over time.
-          </p>
+      <CardHeader className="flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex flex-col gap-1">
+            <CardTitle className="font-heading text-xl">Flow</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Aggregated flow readings — empty windows are between pumping events.
+            </p>
+          </div>
+          {latest !== null && <LatestReadout value={latest} />}
         </div>
-        {latest && <LatestFlowReadout latest={latest} />}
+        <RangeSelector value={range} onChange={setRange} />
       </CardHeader>
       <CardContent>
-        {flowQuery.isPending && <Skeleton className="h-72 w-full" />}
-        {flowQuery.isError && (
-          <div className="flex flex-col gap-3 items-start">
-            <p className="text-destructive text-sm">
-              {flowQuery.error instanceof ApiError
-                ? flowQuery.error.message
-                : "Couldn't load readings."}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => flowQuery.refetch()}
-            >
-              Try again
-            </Button>
-          </div>
-        )}
-        {flowQuery.data && flowQuery.data.length === 0 && (
-          <div className="h-72 flex items-center justify-center text-center">
-            <p className="text-muted-foreground text-sm max-w-xs">
-              No readings yet. Once the flow meter comes online, its readings will appear here.
-            </p>
-          </div>
-        )}
-        {flowQuery.data && flowQuery.data.length > 0 && (
-          <FlowChart readings={flowQuery.data} />
-        )}
+        <ChartArea
+          query={chartQuery}
+          emptyText="No flow readings for this window."
+          render={(points) => <FlowChart points={points} range={range} />}
+        />
       </CardContent>
     </Card>
   )
+}
+
+type ChartQueryLike = {
+  isPending: boolean
+  isError: boolean
+  error: unknown
+  data: ChartPoint[] | undefined
+  refetch: () => void
+}
+
+function ChartArea({
+  query,
+  emptyText,
+  render,
+}: {
+  query: ChartQueryLike
+  emptyText: string
+  render: (points: ChartPoint[]) => React.ReactNode
+}) {
+  if (query.isPending) {
+    return <Skeleton className="h-72 md:h-80 w-full" />
+  }
+  if (query.isError) {
+    return (
+      <div className="flex flex-col gap-3 items-start">
+        <p className="text-destructive text-sm">
+          {query.error instanceof ApiError
+            ? query.error.message
+            : "Couldn't load readings."}
+        </p>
+        <Button variant="outline" size="sm" onClick={() => query.refetch()}>
+          Try again
+        </Button>
+      </div>
+    )
+  }
+  if (!query.data || query.data.length === 0) {
+    return (
+      <div className="h-72 md:h-80 flex items-center justify-center text-center">
+        <p className="text-muted-foreground text-sm max-w-xs">{emptyText}</p>
+      </div>
+    )
+  }
+  return render(query.data)
 }
 
 function PlaceholderPanel({
@@ -288,28 +295,7 @@ function PlaceholderPanel({
   )
 }
 
-function LatestReadout({ latest }: { latest: number }) {
-  return (
-    <div className="flex flex-col items-end gap-0.5">
-      <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-        Latest
-      </span>
-      <span className="text-2xl [font-variant-numeric:tabular-nums] text-foreground">
-        {latest.toFixed(2)}
-        <span className="text-muted-foreground text-base ml-1">m</span>
-      </span>
-    </div>
-  )
-}
-
-function LatestFlowReadout({ latest }: { latest: FlowReading }) {
-  // Prefer the calculated flow rate when the hardware phase has populated
-  // it, and fall back to raw pulses otherwise so the readout is never blank.
-  const hasRate =
-    latest.calculated_flow_rate !== null &&
-    latest.calculated_flow_rate !== undefined
-  const value = hasRate ? latest.calculated_flow_rate! : latest.raw_reading
-  const unit = hasRate ? "L/min" : "raw"
+function LatestReadout({ value, unit }: { value: number; unit?: string }) {
   return (
     <div className="flex flex-col items-end gap-0.5">
       <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
@@ -317,7 +303,9 @@ function LatestFlowReadout({ latest }: { latest: FlowReading }) {
       </span>
       <span className="text-2xl [font-variant-numeric:tabular-nums] text-foreground">
         {value.toFixed(2)}
-        <span className="text-muted-foreground text-base ml-1">{unit}</span>
+        {unit && (
+          <span className="text-muted-foreground text-base ml-1">{unit}</span>
+        )}
       </span>
     </div>
   )
@@ -331,4 +319,13 @@ function SensorHeaderSkeleton() {
       <Skeleton className="h-4 w-96 mt-1" />
     </div>
   )
+}
+
+function latestNonNullValue(points: ChartPoint[] | undefined): number | null {
+  if (!points) return null
+  for (let i = points.length - 1; i >= 0; i--) {
+    const v = points[i].value
+    if (v !== null && v !== undefined) return v
+  }
+  return null
 }

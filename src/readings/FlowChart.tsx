@@ -8,33 +8,40 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import type { FlowReading } from "@/lib/types"
+import type { ChartPoint, ChartRange } from "@/lib/types"
 
 type Point = {
   t: number
-  raw_reading: number
-  calculated_flow_rate: number | null
-  cummulative_volume: number | null
+  value: number | null
 }
 
-export function FlowChart({ readings }: { readings: FlowReading[] }) {
+export function FlowChart({
+  points,
+  range,
+}: {
+  points: ChartPoint[]
+  range: ChartRange
+}) {
   const gradientId = useId()
 
-  const data = useMemo<Point[]>(() => {
-    return readings
-      .map((r) => ({
-        t: new Date(r.created_at).getTime(),
-        raw_reading: r.raw_reading,
-        calculated_flow_rate: r.calculated_flow_rate ?? null,
-        cummulative_volume: r.cummulative_volume ?? null,
-      }))
-      .sort((a, b) => a.t - b.t)
-  }, [readings])
+  const data = useMemo<Point[]>(
+    () =>
+      points
+        .map((p) => ({
+          t: new Date(p.t).getTime(),
+          value: p.value,
+        }))
+        .sort((a, b) => a.t - b.t),
+    [points],
+  )
 
   const yDomain = useMemo<[number, number]>(() => {
-    const values = data.map((d) => d.raw_reading)
-    const min = Math.min(...values)
-    const max = Math.max(...values)
+    const numeric = data
+      .map((d) => d.value)
+      .filter((v): v is number => v !== null)
+    if (numeric.length === 0) return [0, 1]
+    const min = Math.min(...numeric)
+    const max = Math.max(...numeric)
     const padding = Math.max(1, (max - min) * 0.1)
     return [min - padding, max + padding]
   }, [data])
@@ -65,7 +72,7 @@ export function FlowChart({ readings }: { readings: FlowReading[] }) {
             dataKey="t"
             type="number"
             domain={["dataMin", "dataMax"]}
-            tickFormatter={formatTick}
+            tickFormatter={(ts: number) => formatTick(ts, range)}
             stroke="var(--muted-foreground)"
             tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
             axisLine={{ stroke: "var(--border)" }}
@@ -84,7 +91,7 @@ export function FlowChart({ readings }: { readings: FlowReading[] }) {
 
           <Area
             type="monotone"
-            dataKey="raw_reading"
+            dataKey="value"
             stroke="var(--primary)"
             strokeWidth={2}
             fill={`url(#${gradientId})`}
@@ -113,10 +120,17 @@ export function FlowChart({ readings }: { readings: FlowReading[] }) {
   )
 }
 
-function formatTick(ts: number): string {
-  return new Date(ts).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
+function formatTick(ts: number, range: ChartRange): string {
+  const d = new Date(ts)
+  if (range === "day") {
+    return d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
   })
 }
 
@@ -142,21 +156,12 @@ function FlowTooltip({ active, payload }: TooltipProps) {
       <p className="text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
         {formatFullTs(point.t)}
       </p>
-      <p className="mt-1 flex items-baseline gap-1.5">
-        <span className="text-lg text-foreground [font-variant-numeric:tabular-nums]">
-          {point.raw_reading.toFixed(2)}
-        </span>
-        <span className="text-xs text-muted-foreground">raw</span>
-      </p>
-      {point.calculated_flow_rate !== null && (
-        <p className="text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
-          Flow rate {point.calculated_flow_rate.toFixed(2)} L/min
+      {point.value !== null ? (
+        <p className="mt-1 text-lg text-foreground [font-variant-numeric:tabular-nums]">
+          {point.value.toFixed(2)}
         </p>
-      )}
-      {point.cummulative_volume !== null && (
-        <p className="text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
-          Cumulative {point.cummulative_volume.toFixed(1)} L
-        </p>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">No pumping</p>
       )}
     </div>
   )

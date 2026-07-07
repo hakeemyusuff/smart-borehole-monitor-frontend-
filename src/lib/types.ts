@@ -111,3 +111,13 @@ export type Weather = {
   precipitation?: number | null
   created_at: string
 }
+
+export type ChartRange = "day" | "week" | "month"
+
+// The chart endpoint returns aggregated points. `value` is nullable for
+// empty buckets — for water level that's rare, for flow it's the normal
+// case between pumping windows.
+export type ChartPoint = {
+  t: string
+  value: number | null
+}

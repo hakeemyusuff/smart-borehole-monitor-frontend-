@@ -9,44 +9,44 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import type { WaterLevelReading } from "@/lib/types"
+import type { ChartPoint, ChartRange } from "@/lib/types"
 
 type Point = {
   t: number
-  water_level: number
-  calculated_water_depth: number | null
-  label: string
+  value: number | null
 }
 
 export function WaterLevelChart({
-  readings,
+  points,
+  range,
   criticalLow,
   optimalHigh,
 }: {
-  readings: WaterLevelReading[]
+  points: ChartPoint[]
+  range: ChartRange
   criticalLow?: number
   optimalHigh?: number
 }) {
   const gradientId = useId()
 
-  const data = useMemo<Point[]>(() => {
-    return readings
-      .map((r) => {
-        const t = new Date(r.created_at).getTime()
-        return {
-          t,
-          water_level: r.water_level,
-          calculated_water_depth: r.calculated_water_depth ?? null,
-          label: r.created_at,
-        }
-      })
-      .sort((a, b) => a.t - b.t)
-  }, [readings])
+  const data = useMemo<Point[]>(
+    () =>
+      points
+        .map((p) => ({
+          t: new Date(p.t).getTime(),
+          value: p.value,
+        }))
+        .sort((a, b) => a.t - b.t),
+    [points],
+  )
 
   const yDomain = useMemo<[number, number]>(() => {
-    const levels = data.map((d) => d.water_level)
-    const rawMin = Math.min(...levels)
-    const rawMax = Math.max(...levels)
+    const numeric = data
+      .map((d) => d.value)
+      .filter((v): v is number => v !== null)
+    if (numeric.length === 0) return [0, 1]
+    const rawMin = Math.min(...numeric)
+    const rawMax = Math.max(...numeric)
     const thresholds = [criticalLow, optimalHigh].filter(
       (v): v is number => v !== undefined,
     )
@@ -82,7 +82,7 @@ export function WaterLevelChart({
             dataKey="t"
             type="number"
             domain={["dataMin", "dataMax"]}
-            tickFormatter={formatTick}
+            tickFormatter={(ts: number) => formatTick(ts, range)}
             stroke="var(--muted-foreground)"
             tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
             axisLine={{ stroke: "var(--border)" }}
@@ -132,7 +132,7 @@ export function WaterLevelChart({
 
           <Area
             type="monotone"
-            dataKey="water_level"
+            dataKey="value"
             stroke="var(--primary)"
             strokeWidth={2}
             fill={`url(#${gradientId})`}
@@ -161,17 +161,22 @@ export function WaterLevelChart({
   )
 }
 
-function formatTick(ts: number): string {
+function formatTick(ts: number, range: ChartRange): string {
   const d = new Date(ts)
-  return d.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
+  if (range === "day") {
+    return d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
   })
 }
 
 function formatFullTs(ts: number): string {
-  const d = new Date(ts)
-  return d.toLocaleString(undefined, {
+  return new Date(ts).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -192,16 +197,15 @@ function WaterLevelTooltip({ active, payload }: TooltipProps) {
       <p className="text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
         {formatFullTs(point.t)}
       </p>
-      <p className="mt-1 flex items-baseline gap-1.5">
-        <span className="text-lg text-foreground [font-variant-numeric:tabular-nums]">
-          {point.water_level.toFixed(2)}
-        </span>
-        <span className="text-xs text-muted-foreground">m</span>
-      </p>
-      {point.calculated_water_depth !== null && (
-        <p className="text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
-          Calculated depth {point.calculated_water_depth.toFixed(2)}m
+      {point.value !== null ? (
+        <p className="mt-1 flex items-baseline gap-1.5">
+          <span className="text-lg text-foreground [font-variant-numeric:tabular-nums]">
+            {point.value.toFixed(2)}
+          </span>
+          <span className="text-xs text-muted-foreground">m</span>
         </p>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">No reading</p>
       )}
     </div>
   )

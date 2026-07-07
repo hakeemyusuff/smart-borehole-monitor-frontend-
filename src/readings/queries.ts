@@ -1,43 +1,45 @@
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api"
-import type { FlowReading, WaterLevelReading } from "@/lib/types"
+import type { ChartPoint, ChartRange } from "@/lib/types"
 
-export const readingsKeys = {
-  waterLevel: (boreholeId: number, sensorId: number) =>
-    ["readings", "water-level", boreholeId, sensorId] as const,
-  flow: (boreholeId: number, sensorId: number) =>
-    ["readings", "flow", boreholeId, sensorId] as const,
+export const chartKeys = {
+  waterLevel: (boreholeId: number, sensorId: number, range: ChartRange) =>
+    ["readings", "water-level-chart", boreholeId, sensorId, range] as const,
+  flow: (boreholeId: number, sensorId: number, range: ChartRange) =>
+    ["readings", "flow-chart", boreholeId, sensorId, range] as const,
 }
 
-export function useWaterLevelReadings(
+export function useWaterLevelChart(
   boreholeId: number | undefined,
   sensorId: number | undefined,
+  range: ChartRange,
 ) {
   const enabled = boreholeId !== undefined && sensorId !== undefined
   return useQuery({
     queryKey: enabled
-      ? readingsKeys.waterLevel(boreholeId, sensorId)
-      : ["readings", "water-level", "unknown"],
+      ? chartKeys.waterLevel(boreholeId, sensorId, range)
+      : ["readings", "water-level-chart", "unknown", range],
     queryFn: () =>
-      api.get<WaterLevelReading[]>(
-        `/api/sensors/readings/water-level/${boreholeId}/${sensorId}`,
+      api.get<ChartPoint[]>(
+        `/api/sensors/readings/water-level/${boreholeId}/${sensorId}/chart?range_=${range}`,
       ),
     enabled,
   })
 }
 
-export function useFlowReadings(
+export function useFlowChart(
   boreholeId: number | undefined,
   sensorId: number | undefined,
+  range: ChartRange,
 ) {
   const enabled = boreholeId !== undefined && sensorId !== undefined
   return useQuery({
     queryKey: enabled
-      ? readingsKeys.flow(boreholeId, sensorId)
-      : ["readings", "flow", "unknown"],
+      ? chartKeys.flow(boreholeId, sensorId, range)
+      : ["readings", "flow-chart", "unknown", range],
     queryFn: () =>
-      api.get<FlowReading[]>(
-        `/api/sensors/readings/flow-reading/${boreholeId}/${sensorId}`,
+      api.get<ChartPoint[]>(
+        `/api/sensors/readings/flow-reading/${boreholeId}/${sensorId}/chart?range_=${range}`,
       ),
     enabled,
   })
