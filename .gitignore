@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 .claude/settings.local.json
+
+# Snapshotted backend API spec — regenerate locally, don't commit.
+openapi.json
