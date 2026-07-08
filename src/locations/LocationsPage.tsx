@@ -5,13 +5,15 @@ import { useLocations } from "@/locations/queries"
 import { NewLocationDialog } from "@/locations/NewLocationDialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageShell } from "@/components/PageShell"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function LocationsPage() {
   const query = useLocations()
 
   return (
-    <section className="flex flex-col gap-8">
+    <PageShell>
+      <section className="flex flex-col gap-8">
       <header className="flex items-end justify-between gap-4 flex-wrap">
         <div className="flex flex-col gap-1">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -26,7 +28,8 @@ export function LocationsPage() {
       {query.isError && <LocationsError error={query.error} onRetry={() => query.refetch()} />}
       {query.data && query.data.length === 0 && <LocationsEmpty />}
       {query.data && query.data.length > 0 && <LocationsGrid locations={query.data} />}
-    </section>
+      </section>
+    </PageShell>
   )
 }
 

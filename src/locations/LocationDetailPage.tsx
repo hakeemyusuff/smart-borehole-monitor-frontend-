@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api"
 import { useLocation } from "@/locations/queries"
 import { BoreholesPanel } from "@/boreholes/BoreholesPanel"
 import { Button } from "@/components/ui/button"
+import { PageShell } from "@/components/PageShell"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function LocationDetailPage() {
@@ -13,7 +14,8 @@ export function LocationDetailPage() {
   const query = useLocation(idIsValid ? id : undefined)
 
   return (
-    <section className="flex flex-col gap-8">
+    <PageShell>
+      <section className="flex flex-col gap-8">
       <nav>
         <Link
           to="/locations"
@@ -69,7 +71,8 @@ export function LocationDetailPage() {
           )}
         </div>
       )}
-    </section>
+      </section>
+    </PageShell>
   )
 }
 

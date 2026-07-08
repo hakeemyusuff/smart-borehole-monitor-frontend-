@@ -12,6 +12,7 @@ import type {
   WaterLevelReading,
 } from "@/lib/types"
 import { Button } from "@/components/ui/button"
+import { PageShell } from "@/components/PageShell"
 import {
   Select,
   SelectContent,
@@ -104,7 +105,8 @@ export function DataLogsPage() {
     : undefined
 
   return (
-    <section className="flex flex-col gap-8">
+    <PageShell>
+      <section className="flex flex-col gap-8">
       <header className="flex flex-col gap-1">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Data logs
@@ -223,7 +225,8 @@ export function DataLogsPage() {
           />
         )}
       </SelectionGuard>
-    </section>
+      </section>
+    </PageShell>
   )
 }
 

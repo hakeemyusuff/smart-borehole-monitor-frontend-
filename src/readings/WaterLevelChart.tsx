@@ -59,7 +59,7 @@ export function WaterLevelChart({
   if (data.length === 0) return null
 
   return (
-    <div className="w-full h-72 md:h-80">
+    <div className="w-full h-full">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}

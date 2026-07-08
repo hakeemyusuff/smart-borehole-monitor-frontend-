@@ -53,8 +53,8 @@ export function BoreholeCylinder({
   return (
     <svg
       viewBox={`0 0 ${VB_W} ${VB_H}`}
-      width="100%"
-      className="max-w-64 mx-auto block"
+      preserveAspectRatio="xMidYMid meet"
+      className="w-full h-full max-h-full block"
       role="img"
       aria-label={`Borehole cylinder: current level ${
         currentLevel !== null ? currentLevel.toFixed(2) : "unknown"

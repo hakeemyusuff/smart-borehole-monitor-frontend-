@@ -11,6 +11,7 @@ import type { ChartPoint, ChartRange, SensorPublic, SensorStatus } from "@/lib/t
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageShell } from "@/components/PageShell"
 import { RangeSelector } from "@/components/RangeSelector"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -28,7 +29,8 @@ export function SensorDetailPage() {
   const boreholeQuery = useBorehole(idsValid ? boreholeId : undefined)
 
   return (
-    <section className="flex flex-col gap-8">
+    <PageShell>
+      <section className="flex flex-col gap-8">
       <nav>
         <Link
           to={idsValid ? `/boreholes/${boreholeId}` : "/locations"}
@@ -86,7 +88,8 @@ export function SensorDetailPage() {
           )}
         </div>
       )}
-    </section>
+      </section>
+    </PageShell>
   )
 }
 
@@ -273,7 +276,7 @@ function ChartArea({
       </div>
     )
   }
-  return render(query.data)
+  return <div className="h-72 md:h-80 w-full">{render(query.data)}</div>
 }
 
 function PlaceholderPanel({

@@ -17,9 +17,9 @@ export function AppLayout() {
   }, [location.pathname])
 
   return (
-    <div className="min-h-svh flex flex-col overflow-x-clip">
+    <div className="h-svh flex flex-col overflow-hidden">
       {/* Thin top bar — logo + user, status only, NOT primary nav. */}
-      <header className="h-14 shrink-0 flex items-center justify-between gap-3 px-4 md:px-6 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-30">
+      <header className="h-14 shrink-0 flex items-center justify-between gap-3 px-4 md:px-6 border-b border-border bg-background/80 backdrop-blur-sm z-30">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -42,10 +42,9 @@ export function AppLayout() {
       </header>
 
       <div className="flex-1 flex min-h-0 w-full">
-        {/* Desktop sidebar — persistent AND static: sticks under the top bar
-            with its own viewport-locked height so page-scroll doesn't drag
-            it out of view. */}
-        <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border sticky top-14 h-[calc(100svh-3.5rem)] self-start">
+        {/* Desktop sidebar — full-height column inside the fixed-height row.
+            The parent locks height so no sticky trickery is needed. */}
+        <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border h-full">
           <AppSidebar />
         </aside>
 
@@ -61,7 +60,9 @@ export function AppLayout() {
           </SheetContent>
         </Sheet>
 
-        <main className="flex-1 min-w-0 w-full max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10">
+        {/* Main is now a bare full-height flex box. Individual pages decide
+            whether to scroll (via PageShell) or lock (Dashboard). */}
+        <main className="flex-1 min-w-0 min-h-0 flex overflow-hidden">
           <Outlet />
         </main>
       </div>

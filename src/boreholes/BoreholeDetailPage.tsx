@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api"
 import { useBorehole } from "@/boreholes/queries"
 import { SensorsPanel } from "@/sensors/SensorsPanel"
 import { Button } from "@/components/ui/button"
+import { PageShell } from "@/components/PageShell"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export function BoreholeDetailPage() {
@@ -13,7 +14,8 @@ export function BoreholeDetailPage() {
   const query = useBorehole(idIsValid ? id : undefined)
 
   return (
-    <section className="flex flex-col gap-8">
+    <PageShell>
+      <section className="flex flex-col gap-8">
       <nav>
         {query.data?.location_id !== null && query.data?.location_id !== undefined ? (
           <Link
@@ -98,7 +100,8 @@ export function BoreholeDetailPage() {
           )}
         </div>
       )}
-    </section>
+      </section>
+    </PageShell>
   )
 }
 
