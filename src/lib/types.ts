@@ -4,6 +4,13 @@ export type ApiResponse<T> = {
   data: T | null
 }
 
+export type PaginatedEnvelope<T> = {
+  items: T[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export type TokenResponse = {
   access_token: string
   token_type?: string

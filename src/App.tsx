@@ -8,6 +8,7 @@ import { LocationsPage } from "@/locations/LocationsPage"
 import { LocationDetailPage } from "@/locations/LocationDetailPage"
 import { BoreholeDetailPage } from "@/boreholes/BoreholeDetailPage"
 import { SensorDetailPage } from "@/sensors/SensorDetailPage"
+import { DataLogsPage } from "@/data-logs/DataLogsPage"
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             path="/boreholes/:boreholeId/sensors/:sensorId"
             element={<SensorDetailPage />}
           />
+          <Route path="/data-logs" element={<DataLogsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

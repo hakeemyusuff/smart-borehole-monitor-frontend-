@@ -11,6 +11,7 @@ const NAV_ITEMS = [
     // Locations conceptually, so keep the nav item lit for those routes too.
     prefixes: ["/locations", "/boreholes"],
   },
+  { to: "/data-logs", label: "Data logs", icon: DataLogsIcon, prefixes: ["/data-logs"] },
 ]
 
 const APP_VERSION = "v1.0.0-beta"
@@ -82,6 +83,32 @@ function DashboardIcon({ active }: { active: boolean }) {
       <rect x={2} y={11} width={5} height={3} rx={1} stroke={stroke} strokeWidth={1.3} />
       <rect x={9} y={2} width={5} height={3} rx={1} stroke={stroke} strokeWidth={1.3} />
       <rect x={9} y={7} width={5} height={7} rx={1} stroke={stroke} strokeWidth={1.3} />
+    </svg>
+  )
+}
+
+function DataLogsIcon({ active }: { active: boolean }) {
+  const stroke = active ? "var(--primary)" : "currentColor"
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+      className="shrink-0"
+    >
+      <rect
+        x={2}
+        y={2.5}
+        width={12}
+        height={11}
+        rx={1.5}
+        stroke={stroke}
+        strokeWidth={1.3}
+      />
+      <path d="M 2 6.5 L 14 6.5" stroke={stroke} strokeWidth={1.3} />
+      <path d="M 6 6.5 L 6 13.5" stroke={stroke} strokeWidth={1.3} />
     </svg>
   )
 }
