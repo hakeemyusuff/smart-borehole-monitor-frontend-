@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api"
+import { liveQueryOptions } from "@/lib/query-client"
 import type { ChartPoint, ChartRange } from "@/lib/types"
 
 export const chartKeys = {
@@ -24,6 +25,7 @@ export function useWaterLevelChart(
         `/api/sensors/readings/water-level/${boreholeId}/${sensorId}/chart?range_=${range}`,
       ),
     enabled,
+    ...liveQueryOptions,
   })
 }
 
@@ -42,5 +44,6 @@ export function useFlowChart(
         `/api/sensors/readings/flow-reading/${boreholeId}/${sensorId}/chart?range_=${range}`,
       ),
     enabled,
+    ...liveQueryOptions,
   })
 }

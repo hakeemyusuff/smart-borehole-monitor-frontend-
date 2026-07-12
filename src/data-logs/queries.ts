@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api"
+import { liveQueryOptions } from "@/lib/query-client"
 import type {
   FlowReading,
   PaginatedEnvelope,
@@ -40,5 +41,6 @@ export function useReadingsPage<K extends ReadingKind>(
         `/api/sensors/readings/${kind}/${boreholeId}/${sensorId}?skip=${skip}&limit=${limit}`,
       ),
     enabled,
+    ...liveQueryOptions,
   })
 }
