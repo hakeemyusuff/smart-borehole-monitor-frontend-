@@ -178,18 +178,19 @@ function DepthTick({ y, label }: { y: number; label: string }) {
   return (
     <g>
       <line
-        x1={30}
+        x1={28}
         y1={y}
         x2={40}
         y2={y}
         stroke="var(--muted-foreground)"
-        strokeOpacity={0.5}
-        strokeWidth={1}
+        strokeOpacity={0.6}
+        strokeWidth={1.5}
       />
       <text
-        x={26}
-        y={y + 3}
-        fontSize={9}
+        x={24}
+        y={y + 5}
+        fontSize={16}
+        fontWeight={500}
         fill="var(--muted-foreground)"
         textAnchor="end"
         style={{ fontVariantNumeric: "tabular-nums" }}
@@ -223,16 +224,16 @@ function ThresholdLine({
         x2={cylX + cylW + 4}
         y2={y}
         stroke={color}
-        strokeDasharray="3 3"
-        strokeWidth={1.2}
-        strokeOpacity={0.85}
+        strokeDasharray="4 4"
+        strokeWidth={1.8}
+        strokeOpacity={0.9}
       />
       <text
         x={cylX + cylW + 8}
-        y={anchor === "above" ? y - 3 : y + 10}
-        fontSize={10}
+        y={anchor === "above" ? y - 5 : y + 18}
+        fontSize={18}
+        fontWeight={500}
         fill={color}
-        opacity={0.9}
       >
         {label}
       </text>

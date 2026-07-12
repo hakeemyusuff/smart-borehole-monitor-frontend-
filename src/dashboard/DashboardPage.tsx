@@ -306,15 +306,15 @@ function CylinderCard({
           )}
         </div>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 min-w-0 flex flex-col">
+      <CardContent className="flex flex-col lg:flex-1 lg:min-h-0 lg:min-w-0">
         {!hasSensor && !sensorsPending ? (
-          <div className="flex-1 min-h-0 flex items-center justify-center text-center">
+          <div className="h-72 md:h-80 lg:h-auto lg:flex-1 lg:min-h-0 flex items-center justify-center text-center">
             <p className="text-sm text-muted-foreground">
               No pressure transducer installed on this borehole yet.
             </p>
           </div>
         ) : (
-          <div className="flex-1 min-h-0 min-w-0 h-64 lg:h-auto flex items-center justify-center">
+          <div className="h-72 md:h-80 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0 flex items-center justify-center">
             <BoreholeCylinder
               totalDepth={borehole.total_depth}
               criticalLow={borehole.critical_low_level}
@@ -346,7 +346,7 @@ function ChartCard({
       <CardHeader className="shrink-0">
         <CardTitle className="font-heading text-xl">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 min-w-0 flex flex-col">
+      <CardContent className="flex flex-col lg:flex-1 lg:min-h-0 lg:min-w-0">
         {children}
       </CardContent>
     </Card>
@@ -448,11 +448,11 @@ function OverviewChartArea({
   render: (points: ChartPoint[]) => React.ReactNode
 }) {
   if (sensorsPending || (hasSensor && chartPending)) {
-    return <Skeleton className="flex-1 min-h-0 min-w-0 h-56 lg:h-auto w-full" />
+    return <Skeleton className="h-64 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0 w-full" />
   }
   if (!hasSensor) {
     return (
-      <div className="flex-1 min-h-0 min-w-0 h-56 lg:h-auto flex items-center justify-center text-center">
+      <div className="h-64 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0 flex items-center justify-center text-center">
         <p className="text-muted-foreground text-sm max-w-xs">
           {missingSensorText}
         </p>
@@ -471,13 +471,13 @@ function OverviewChartArea({
   }
   if (!data || data.length === 0) {
     return (
-      <div className="flex-1 min-h-0 min-w-0 h-56 lg:h-auto flex items-center justify-center text-center">
+      <div className="h-64 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0 flex items-center justify-center text-center">
         <p className="text-muted-foreground text-sm max-w-xs">{emptyText}</p>
       </div>
     )
   }
   return (
-    <div className="flex-1 min-h-0 min-w-0 w-full h-56 lg:h-auto">
+    <div className="w-full h-64 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0">
       {render(data)}
     </div>
   )
