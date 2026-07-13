@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { BoreholeCylinder } from "@/dashboard/BoreholeCylinder"
 import { WaterLevelChart } from "@/readings/WaterLevelChart"
 import { FlowChart } from "@/readings/FlowChart"
+import { REQUEST_ACCESS_MAILTO } from "@/lib/contact"
 import type { ChartPoint } from "@/lib/types"
 
 export function LandingPage() {
@@ -38,7 +39,7 @@ function TopBar({ isAuthenticated }: { isAuthenticated: boolean }) {
                 <Link to="/login">Sign in</Link>
               </Button>
               <Button asChild size="sm">
-                <Link to="/register">Create account</Link>
+                <a href={REQUEST_ACCESS_MAILTO}>Request access</a>
               </Button>
             </>
           )}
@@ -72,7 +73,7 @@ function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
           ) : (
             <>
               <Button asChild size="lg">
-                <Link to="/register">Get started</Link>
+                <a href={REQUEST_ACCESS_MAILTO}>Request access</a>
               </Button>
               <Button asChild variant="outline" size="lg">
                 <Link to="/login">I have an account</Link>

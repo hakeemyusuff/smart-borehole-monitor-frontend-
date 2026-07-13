@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
 import type { TokenResponse } from "@/lib/types";
 import { useAuth } from "@/auth/useAuth";
+import { REQUEST_ACCESS_MAILTO } from "@/lib/contact";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -102,9 +103,12 @@ export function LoginPage() {
             </Button>
             <p className="text-sm text-muted-foreground">
               No account?{" "}
-              <Link to="/register" className="underline underline-offset-4">
-                Create one
-              </Link>
+              <a
+                href={REQUEST_ACCESS_MAILTO}
+                className="underline underline-offset-4"
+              >
+                Request access
+              </a>
             </p>
           </CardFooter>
         </form>
