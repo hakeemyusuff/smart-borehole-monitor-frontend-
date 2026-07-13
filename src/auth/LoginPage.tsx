@@ -27,7 +27,10 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const from = (location.state as LocationState)?.from?.pathname ?? "/";
+  // Fall back to /dashboard: if there's no `from` state, the user came
+  // straight to /login (via the landing page CTA or a bookmark), not
+  // because ProtectedRoute bounced them off a deep link.
+  const from = (location.state as LocationState)?.from?.pathname ?? "/dashboard";
 
   const mutation = useMutation({
     mutationFn: async () => {
