@@ -12,7 +12,6 @@ import type {
   WaterLevelReading,
 } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { PageShell } from "@/components/PageShell"
 import {
   Select,
   SelectContent,
@@ -105,20 +104,19 @@ export function DataLogsPage() {
     : undefined
 
   return (
-    <PageShell>
-      <section className="flex flex-col gap-8">
-      <header className="flex flex-col gap-1">
+    <div className="h-full w-full flex flex-col p-4 md:p-6 overflow-y-auto lg:overflow-hidden min-w-0">
+      <header className="shrink-0 mb-6 flex flex-col gap-1">
         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Data logs
         </p>
-        <h1 className="text-4xl font-medium">Transmissions</h1>
+        <h1 className="text-3xl md:text-4xl font-medium">Transmissions</h1>
         <p className="text-muted-foreground text-sm mt-1 max-w-prose">
           Raw sensor readings as they arrived. No aggregation, no smoothing —
           the honest counterpart to the charts.
         </p>
       </header>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
+      <div className="shrink-0 mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
         <SelectorField label="Location">
           <Select
             value={locationId !== undefined ? String(locationId) : undefined}
@@ -206,27 +204,28 @@ export function DataLogsPage() {
         </SelectorField>
       </div>
 
-      <SelectionGuard
-        locationsPending={locationsQuery.isPending}
-        hasAnyLocation={(locationsQuery.data ?? []).length > 0}
-        hasBoreholes={boreholesInLocation.length > 0}
-        boreholesPending={boreholesQuery.isPending}
-        hasReadableSensors={readableSensors.length > 0}
-        sensorsPending={sensorsQuery.isPending}
-        boreholeSelected={boreholeId !== undefined}
-      >
-        {currentSensor && kind && boreholeId !== undefined && (
-          <ReadingsPanel
-            kind={kind}
-            boreholeId={boreholeId}
-            sensor={currentSensor}
-            skip={skip}
-            onPageChange={setSkip}
-          />
-        )}
-      </SelectionGuard>
-      </section>
-    </PageShell>
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col">
+        <SelectionGuard
+          locationsPending={locationsQuery.isPending}
+          hasAnyLocation={(locationsQuery.data ?? []).length > 0}
+          hasBoreholes={boreholesInLocation.length > 0}
+          boreholesPending={boreholesQuery.isPending}
+          hasReadableSensors={readableSensors.length > 0}
+          sensorsPending={sensorsQuery.isPending}
+          boreholeSelected={boreholeId !== undefined}
+        >
+          {currentSensor && kind && boreholeId !== undefined && (
+            <ReadingsPanel
+              kind={kind}
+              boreholeId={boreholeId}
+              sensor={currentSensor}
+              skip={skip}
+              onPageChange={setSkip}
+            />
+          )}
+        </SelectionGuard>
+      </div>
+    </div>
   )
 }
 
@@ -247,10 +246,10 @@ function ReadingsPanel({
 
   if (query.isPending) {
     return (
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-9 w-full" />
+      <div className="flex flex-col gap-2 lg:flex-1 lg:min-h-0">
+        <Skeleton className="h-9 w-full shrink-0" />
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-11 w-full" />
+          <Skeleton key={i} className="h-11 w-full shrink-0" />
         ))}
       </div>
     )
@@ -274,7 +273,7 @@ function ReadingsPanel({
   const { items, total, offset } = query.data
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-border/70 bg-card/40 p-10 text-center">
+      <div className="rounded-xl border border-border/70 bg-card/40 p-10 text-center lg:flex-1 lg:min-h-0 flex items-center justify-center">
         <p className="text-muted-foreground text-sm">
           No transmissions yet from this sensor.
         </p>
@@ -288,15 +287,15 @@ function ReadingsPanel({
   const canNext = offset + items.length < total
 
   return (
-    <div className="flex flex-col gap-4 animate-in fade-in duration-300">
-      <div className="w-full overflow-x-auto rounded-xl border border-border/70">
+    <div className="flex flex-col gap-4 animate-in fade-in duration-300 lg:flex-1 lg:min-h-0 lg:min-w-0">
+      <div className="w-full overflow-x-auto rounded-xl border border-border/70 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
         {kind === "water-level" ? (
           <WaterLevelTable items={items as WaterLevelReading[]} />
         ) : (
           <FlowTable items={items as FlowReading[]} />
         )}
       </div>
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="shrink-0 flex items-center justify-between flex-wrap gap-3">
         <p className="text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
           Showing {from.toLocaleString()}–{to.toLocaleString()} of{" "}
           {total.toLocaleString()}
@@ -327,7 +326,7 @@ function ReadingsPanel({
 function WaterLevelTable({ items }: { items: WaterLevelReading[] }) {
   return (
     <table className="w-full text-sm [font-variant-numeric:tabular-nums]">
-      <thead className="bg-secondary/40 text-muted-foreground text-xs uppercase tracking-[0.14em]">
+      <thead className="bg-secondary text-muted-foreground text-xs uppercase tracking-[0.14em] lg:sticky lg:top-0 lg:z-10">
         <tr>
           <Th>Timestamp</Th>
           <Th align="right">Water level (m)</Th>
@@ -358,7 +357,7 @@ function WaterLevelTable({ items }: { items: WaterLevelReading[] }) {
 function FlowTable({ items }: { items: FlowReading[] }) {
   return (
     <table className="w-full text-sm [font-variant-numeric:tabular-nums]">
-      <thead className="bg-secondary/40 text-muted-foreground text-xs uppercase tracking-[0.14em]">
+      <thead className="bg-secondary text-muted-foreground text-xs uppercase tracking-[0.14em] lg:sticky lg:top-0 lg:z-10">
         <tr>
           <Th>Timestamp</Th>
           <Th align="right">Raw reading</Th>
@@ -470,7 +469,7 @@ function SelectionGuard({
   children: React.ReactNode
 }) {
   if (locationsPending) {
-    return <Skeleton className="h-64 w-full" />
+    return <Skeleton className="h-64 w-full lg:flex-1 lg:min-h-0" />
   }
   if (!hasAnyLocation) {
     return (
@@ -478,7 +477,7 @@ function SelectionGuard({
     )
   }
   if (boreholesPending) {
-    return <Skeleton className="h-64 w-full" />
+    return <Skeleton className="h-64 w-full lg:flex-1 lg:min-h-0" />
   }
   if (!hasBoreholes) {
     return (
@@ -489,7 +488,7 @@ function SelectionGuard({
     return null
   }
   if (sensorsPending) {
-    return <Skeleton className="h-64 w-full" />
+    return <Skeleton className="h-64 w-full lg:flex-1 lg:min-h-0" />
   }
   if (!hasReadableSensors) {
     return (
@@ -501,7 +500,7 @@ function SelectionGuard({
 
 function EmptyBlock({ text }: { text: string }) {
   return (
-    <div className="rounded-xl border border-border/70 bg-card/40 p-10 text-center">
+    <div className="rounded-xl border border-border/70 bg-card/40 p-10 text-center lg:flex-1 lg:min-h-0 flex items-center justify-center">
       <p className="text-muted-foreground text-sm max-w-prose mx-auto">
         {text}
       </p>
