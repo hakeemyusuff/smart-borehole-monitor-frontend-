@@ -97,7 +97,6 @@ export type WaterLevelReading = {
   sensor_id?: number | null
   created_at: string
   water_level: number
-  calculated_water_depth?: number | null
 }
 
 export type FlowReading = {
@@ -105,9 +104,7 @@ export type FlowReading = {
   borehole_id?: number | null
   sensor_id?: number | null
   created_at: string
-  raw_reading: number
-  calculated_flow_rate?: number | null
-  cummulative_volume?: number | null
+  abstraction_rate: number
 }
 
 export type Weather = {

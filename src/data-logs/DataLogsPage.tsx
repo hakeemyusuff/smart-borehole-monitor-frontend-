@@ -330,7 +330,6 @@ function WaterLevelTable({ items }: { items: WaterLevelReading[] }) {
         <tr>
           <Th>Timestamp</Th>
           <Th align="right">Water level (m)</Th>
-          <Th align="right">Depth (m)</Th>
         </tr>
       </thead>
       <tbody>
@@ -341,12 +340,6 @@ function WaterLevelTable({ items }: { items: WaterLevelReading[] }) {
           >
             <Td>{formatTs(r.created_at)}</Td>
             <Td align="right">{r.water_level.toFixed(3)}</Td>
-            <Td align="right">
-              {r.calculated_water_depth !== null &&
-              r.calculated_water_depth !== undefined
-                ? r.calculated_water_depth.toFixed(3)
-                : "—"}
-            </Td>
           </tr>
         ))}
       </tbody>
@@ -360,9 +353,7 @@ function FlowTable({ items }: { items: FlowReading[] }) {
       <thead className="bg-secondary text-muted-foreground text-xs uppercase tracking-[0.14em] lg:sticky lg:top-0 lg:z-10">
         <tr>
           <Th>Timestamp</Th>
-          <Th align="right">Raw reading</Th>
-          <Th align="right">Flow rate</Th>
-          <Th align="right">Cumulative volume</Th>
+          <Th align="right">Abstraction rate (L/min)</Th>
         </tr>
       </thead>
       <tbody>
@@ -372,19 +363,7 @@ function FlowTable({ items }: { items: FlowReading[] }) {
             className="border-t border-border/60 hover:bg-secondary/20 transition-colors"
           >
             <Td>{formatTs(r.created_at)}</Td>
-            <Td align="right">{r.raw_reading.toFixed(3)}</Td>
-            <Td align="right">
-              {r.calculated_flow_rate !== null &&
-              r.calculated_flow_rate !== undefined
-                ? r.calculated_flow_rate.toFixed(3)
-                : "—"}
-            </Td>
-            <Td align="right">
-              {r.cummulative_volume !== null &&
-              r.cummulative_volume !== undefined
-                ? r.cummulative_volume.toFixed(3)
-                : "—"}
-            </Td>
+            <Td align="right">{r.abstraction_rate.toFixed(3)}</Td>
           </tr>
         ))}
       </tbody>
