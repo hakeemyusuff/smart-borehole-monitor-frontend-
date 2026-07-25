@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { useBorehole } from "@/boreholes/queries"
 import { SensorsPanel } from "@/sensors/SensorsPanel"
+import { PumpHistoryPanel } from "@/pump/PumpHistoryPanel"
 import { Button } from "@/components/ui/button"
 import { PageShell } from "@/components/PageShell"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -96,7 +97,10 @@ export function BoreholeDetailPage() {
           </div>
 
           {query.data.id !== null && query.data.id !== undefined && (
-            <SensorsPanel boreholeId={query.data.id} />
+            <>
+              <SensorsPanel boreholeId={query.data.id} />
+              <PumpHistoryPanel boreholeId={query.data.id} />
+            </>
           )}
         </div>
       )}

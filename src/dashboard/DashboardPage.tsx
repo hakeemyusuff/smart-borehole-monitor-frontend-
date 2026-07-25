@@ -9,7 +9,8 @@ import { useFlowChart, useWaterLevelChart } from "@/readings/queries"
 import { WaterLevelChart } from "@/readings/WaterLevelChart"
 import { FlowChart } from "@/readings/FlowChart"
 import { BoreholeCylinder } from "@/dashboard/BoreholeCylinder"
-import { PumpStatusTile } from "@/dashboard/PumpStatusTile"
+import { PumpControlCard } from "@/pump/PumpControlCard"
+import { WeatherStrip } from "@/weather/WeatherStrip"
 import type { Borehole, ChartPoint, Location, SensorPublic } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -234,7 +235,10 @@ function BoreholeGrid({ borehole }: { borehole: Borehole }) {
           pressureSensor={pressureSensor}
           sensorsPending={sensorsQuery.isPending}
         />
-        <PumpStatusTile />
+        <WeatherStrip locationId={borehole.location_id ?? undefined} />
+        {boreholeId !== undefined && (
+          <PumpControlCard boreholeId={boreholeId} />
+        )}
       </div>
 
       <div className="flex flex-col gap-4 min-w-0 lg:col-span-8 lg:grid lg:grid-rows-2 lg:h-full lg:min-h-0 lg:min-w-0">

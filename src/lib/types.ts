@@ -116,6 +116,39 @@ export type Weather = {
   created_at: string
 }
 
+export type PumpStatus = "on" | "off"
+export type PumpAction = "turned_on" | "turned_off"
+export type PumpTrigger =
+  | "automatic_schedule"
+  | "manual_override"
+  | "critical_safety"
+
+export type Pump = {
+  id?: number | null
+  borehole_id?: number | null
+  status: PumpStatus
+  power_rating: number
+  depth: number
+  last_status_change?: string | null
+}
+
+export type PumpHistory = {
+  id?: number | null
+  pump_id?: number | null
+  action: PumpAction
+  triggered_by: PumpTrigger
+  created_at: string
+}
+
+export type StatusChange = { new_status: PumpStatus }
+
+// POST /api/pumps/{borehole_id} returns both the updated pump and the
+// history entry created for the transition.
+export type PumpStatusChangeResponse = {
+  pump: Pump
+  pump_history: PumpHistory | null
+}
+
 export type ChartRange = "day" | "week" | "month"
 
 // The chart endpoint returns aggregated points. `value` is nullable for
