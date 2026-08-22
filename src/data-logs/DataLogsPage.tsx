@@ -338,7 +338,7 @@ function WaterLevelTable({ items }: { items: WaterLevelReading[] }) {
             key={r.id ?? i}
             className="border-t border-border/60 hover:bg-secondary/20 transition-colors"
           >
-            <Td>{formatTs(r.created_at)}</Td>
+            <Td>{formatTs(r.captured_at)}</Td>
             <Td align="right">{r.water_level.toFixed(3)}</Td>
           </tr>
         ))}
@@ -362,7 +362,7 @@ function FlowTable({ items }: { items: FlowReading[] }) {
             key={r.id ?? i}
             className="border-t border-border/60 hover:bg-secondary/20 transition-colors"
           >
-            <Td>{formatTs(r.created_at)}</Td>
+            <Td>{formatTs(r.captured_at)}</Td>
             <Td align="right">{r.abstraction_rate.toFixed(3)}</Td>
           </tr>
         ))}

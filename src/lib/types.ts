@@ -95,6 +95,10 @@ export type WaterLevelReading = {
   id?: number | null
   borehole_id?: number | null
   sensor_id?: number | null
+  // `captured_at` is when the sensor took the measurement; `created_at`
+  // is when the row landed on the server. Use `captured_at` for anything
+  // user-facing about "when did this reading happen".
+  captured_at: string
   created_at: string
   water_level: number
 }
@@ -103,6 +107,7 @@ export type FlowReading = {
   id?: number | null
   borehole_id?: number | null
   sensor_id?: number | null
+  captured_at: string
   created_at: string
   abstraction_rate: number
 }

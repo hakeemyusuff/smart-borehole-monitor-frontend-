@@ -330,7 +330,7 @@ function CylinderCard({
         )}
         {latest && (
           <p className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-muted-foreground text-center mt-3 [font-variant-numeric:tabular-nums]">
-            As of {formatShortTs(latest.created_at)}
+            As of {formatShortTs(latest.captured_at)}
           </p>
         )}
       </CardContent>
