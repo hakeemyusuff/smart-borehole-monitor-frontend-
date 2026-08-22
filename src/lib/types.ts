@@ -145,6 +145,12 @@ export type PumpHistory = {
   created_at: string
 }
 
+export type PumpCreate = {
+  borehole_id: number
+  power_rating: number
+  depth: number
+}
+
 export type StatusChange = { new_status: PumpStatus }
 
 // POST /api/pumps/{borehole_id} returns both the updated pump and the

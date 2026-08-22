@@ -84,10 +84,12 @@ export function BoreholeCylinder({
         </clipPath>
       </defs>
 
-      {/* Depth ticks on the left. Just three: 0, mid, floor. */}
-      <DepthTick y={CYL_TOP} label="0m" />
+      {/* Water-level ticks on the left. Higher values sit higher up:
+          water_level counts UP from the borehole floor, so 0m is the
+          empty bottom and totalDepth is the "full to the top" reading. */}
+      <DepthTick y={CYL_TOP} label={`${totalDepth.toFixed(0)}m`} />
       <DepthTick y={CYL_TOP + CYL_H / 2} label={`${(totalDepth / 2).toFixed(0)}m`} />
-      <DepthTick y={CYL_BOTTOM} label={`${totalDepth.toFixed(0)}m`} />
+      <DepthTick y={CYL_BOTTOM} label="0m" />
 
       {/* Cylinder outline (rounded pill shape). */}
       <rect

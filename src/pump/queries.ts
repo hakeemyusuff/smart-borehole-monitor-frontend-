@@ -3,11 +3,12 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
-import { api } from "@/lib/api"
+import { api, ApiError } from "@/lib/api"
 import { liveQueryOptions } from "@/lib/query-client"
 import type {
   PaginatedEnvelope,
   Pump,
+  PumpCreate,
   PumpHistory,
   PumpStatus,
   PumpStatusChangeResponse,
@@ -23,9 +24,19 @@ export const pumpKeys = {
 
 export function usePump(boreholeId: number | undefined) {
   const enabled = boreholeId !== undefined
-  return useQuery({
+  return useQuery<Pump | null>({
     queryKey: enabled ? pumpKeys.forBorehole(boreholeId) : ["pump", "unknown"],
-    queryFn: () => api.get<Pump>(`/api/pumps/${boreholeId}`),
+    queryFn: async () => {
+      try {
+        return await api.get<Pump>(`/api/pumps/${boreholeId}`)
+      } catch (e) {
+        // Backend returns 404 when the borehole has no pump yet — treat
+        // as an empty-state result, not an error, so the UI can offer to
+        // install one.
+        if (e instanceof ApiError && e.status === 404) return null
+        throw e
+      }
+    },
     enabled,
     ...liveQueryOptions,
   })
@@ -47,6 +58,19 @@ export function usePumpHistoryPage(
       ),
     enabled,
     ...liveQueryOptions,
+  })
+}
+
+export function useCreatePump(boreholeId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: PumpCreate) => api.post<Pump>("/api/pumps/", body),
+    onSuccess: (pump) => {
+      // Server returns the installed pump — seed the cache so the
+      // dashboard control card flips out of the "no pump" state
+      // immediately.
+      qc.setQueryData(pumpKeys.forBorehole(boreholeId), pump)
+    },
   })
 }
 
