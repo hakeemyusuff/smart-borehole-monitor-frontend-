@@ -238,8 +238,11 @@ function BoreholeGrid({ borehole }: { borehole: Borehole }) {
 
   return (
     <div className="flex flex-col gap-4 md:gap-6 animate-in fade-in duration-300 min-w-0">
-      {/* KPI strip — quick-glance summaries at the top of the scroll. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 min-w-0">
+      {/* KPI strip — quick-glance summaries at the top of the scroll.
+          items-start lets compact cards stay compact (default grid
+          stretches to the tallest sibling, which leaves ugly dead space
+          when the water-level or weather card is empty). */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 min-w-0 items-start">
         <LatestLevelKpi
           boreholeId={boreholeId}
           pressureSensor={pressureSensor}
