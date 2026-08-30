@@ -6,21 +6,35 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 
 /**
- * Full list of pump windows for a borehole, rendered as a table below
- * PumpHistoryPanel. No pagination — this project won't exceed a few
- * dozen rows in practice.
+ * Renders the pump-windows runs table. `hideHeader` matches PumpHistory
+ * Panel's behavior — inside a tabbed PumpPage the section fills its
+ * parent and the table body scrolls internally with sticky thead.
+ * No pagination — the endpoint returns the full array; a few dozen
+ * rows fits without paging.
  */
-export function PumpWindowsPanel({ boreholeId }: { boreholeId: number }) {
+export function PumpWindowsPanel({
+  boreholeId,
+  hideHeader = false,
+}: {
+  boreholeId: number
+  hideHeader?: boolean
+}) {
   const query = usePumpWindows(boreholeId)
 
+  const rootCls = hideHeader
+    ? "flex flex-col gap-4 lg:flex-1 lg:min-h-0 lg:min-w-0"
+    : "flex flex-col gap-4"
+
   return (
-    <section className="flex flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-          Pump windows
-        </p>
-        <h2 className="text-2xl font-heading font-medium">Runs</h2>
-      </header>
+    <section className={rootCls}>
+      {!hideHeader && (
+        <header className="flex flex-col gap-1">
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            Pump windows
+          </p>
+          <h2 className="text-2xl font-heading font-medium">Runs</h2>
+        </header>
+      )}
 
       {query.isPending && <TableSkeleton />}
 
@@ -46,7 +60,7 @@ export function PumpWindowsPanel({ boreholeId }: { boreholeId: number }) {
       )}
 
       {query.data && query.data.length > 0 && (
-        <div className="w-full overflow-x-auto rounded-xl border border-border/70">
+        <div className="w-full overflow-x-auto rounded-xl border border-border/70 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
           <WindowsTable items={query.data} />
         </div>
       )}
@@ -57,7 +71,7 @@ export function PumpWindowsPanel({ boreholeId }: { boreholeId: number }) {
 function WindowsTable({ items }: { items: PumpWindow[] }) {
   return (
     <table className="w-full text-sm [font-variant-numeric:tabular-nums]">
-      <thead className="bg-secondary text-muted-foreground text-xs uppercase tracking-[0.14em]">
+      <thead className="bg-secondary text-muted-foreground text-xs uppercase tracking-[0.14em] lg:sticky lg:top-0 lg:z-10">
         <tr>
           <th className="text-left px-4 py-2.5 font-medium whitespace-nowrap">
             Start

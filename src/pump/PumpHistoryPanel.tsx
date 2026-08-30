@@ -8,21 +8,35 @@ import { Skeleton } from "@/components/ui/skeleton"
 const PAGE_SIZE = 25
 
 /**
- * Rendered on the BoreholeDetailPage below the sensors panel. Same
- * newest-first + skip/limit pagination pattern as the readings tables.
+ * Renders the pump-history transitions table. When `hideHeader` is set
+ * (typical inside a tabbed PumpPage) the section fills its parent and
+ * the table body scrolls internally with a sticky thead — the section
+ * root becomes flex-1 so the pagination footer stays pinned.
  */
-export function PumpHistoryPanel({ boreholeId }: { boreholeId: number }) {
+export function PumpHistoryPanel({
+  boreholeId,
+  hideHeader = false,
+}: {
+  boreholeId: number
+  hideHeader?: boolean
+}) {
   const [skip, setSkip] = useState(0)
   const query = usePumpHistoryPage(boreholeId, skip, PAGE_SIZE)
 
+  const rootCls = hideHeader
+    ? "flex flex-col gap-4 lg:flex-1 lg:min-h-0 lg:min-w-0"
+    : "flex flex-col gap-4"
+
   return (
-    <section className="flex flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-          Pump history
-        </p>
-        <h2 className="text-2xl font-heading font-medium">Transitions</h2>
-      </header>
+    <section className={rootCls}>
+      {!hideHeader && (
+        <header className="flex flex-col gap-1">
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            Pump history
+          </p>
+          <h2 className="text-2xl font-heading font-medium">Transitions</h2>
+        </header>
+      )}
 
       {query.isPending && <HistorySkeleton />}
 
@@ -49,16 +63,18 @@ export function PumpHistoryPanel({ boreholeId }: { boreholeId: number }) {
 
       {query.data && query.data.items.length > 0 && (
         <>
-          <div className="w-full overflow-x-auto rounded-xl border border-border/70">
+          <div className="w-full overflow-x-auto rounded-xl border border-border/70 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
             <HistoryTable items={query.data.items} />
           </div>
-          <Pagination
-            offset={query.data.offset}
-            shown={query.data.items.length}
-            total={query.data.total}
-            skip={skip}
-            onPageChange={setSkip}
-          />
+          <div className="shrink-0">
+            <Pagination
+              offset={query.data.offset}
+              shown={query.data.items.length}
+              total={query.data.total}
+              skip={skip}
+              onPageChange={setSkip}
+            />
+          </div>
         </>
       )}
     </section>
@@ -68,7 +84,7 @@ export function PumpHistoryPanel({ boreholeId }: { boreholeId: number }) {
 function HistoryTable({ items }: { items: PumpHistory[] }) {
   return (
     <table className="w-full text-sm [font-variant-numeric:tabular-nums]">
-      <thead className="bg-secondary text-muted-foreground text-xs uppercase tracking-[0.14em]">
+      <thead className="bg-secondary text-muted-foreground text-xs uppercase tracking-[0.14em] lg:sticky lg:top-0 lg:z-10">
         <tr>
           <th className="text-left px-4 py-2.5 font-medium whitespace-nowrap">
             Timestamp

@@ -188,13 +188,21 @@ function WaterLevelPanel({
             <p className="text-xs text-muted-foreground">
               Readings from this sensor over time.
               {showRain && (
-                <> Grey bars show hourly rainfall for recharge context.</>
+                <> Blue bars show hourly rainfall for recharge context.</>
               )}
             </p>
           </div>
           {latest !== null && <LatestReadout value={latest} unit="m" />}
         </div>
-        <RangeSelector value={range} onChange={setRange} />
+        <div className="flex items-center gap-4 flex-wrap">
+          <RangeSelector value={range} onChange={setRange} />
+          {showRain && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="w-3 h-2.5 rounded-sm" style={{ background: "#5B9BD5", opacity: 0.35 }} />
+              Rainfall (mm)
+            </span>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <ChartArea

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { useLocations } from "@/locations/queries"
@@ -11,16 +11,19 @@ import { WaterLevelChart } from "@/readings/WaterLevelChart"
 import { FlowChart } from "@/readings/FlowChart"
 import { PredictionChart } from "@/predictions/PredictionChart"
 import { BoreholeCylinder } from "@/dashboard/BoreholeCylinder"
-import { PumpControlCard } from "@/pump/PumpControlCard"
-import { LatestPumpWindowTile } from "@/pump/LatestPumpWindowTile"
-import { WeatherStrip } from "@/weather/WeatherStrip"
+import { usePump, useChangePumpStatus } from "@/pump/queries"
+import { usePumpWindows } from "@/pump/queries"
+import { useWeatherSeries } from "@/weather/queries"
+import { cn } from "@/lib/utils"
 import type {
   Borehole,
   ChartPoint,
   Location,
   PredictionChartPoint,
+  PumpStatus,
   SensorPublic,
   WaterLevelReading,
+  Weather,
 } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +35,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { toast } from "sonner"
 
 export function DashboardPage() {
   const [params, setParams] = useSearchParams()
@@ -87,12 +99,6 @@ export function DashboardPage() {
     currentIndex >= 0 ? boreholesInLocation[currentIndex] : undefined
 
   return (
-    // Dashboard scrolls at all sizes now — the new prediction chart +
-    // pump window tile don't fit a locked viewport, and stacking charts
-    // in a fixed grid would just crush them. Chart cards still get
-    // explicit heights (h-80 md:h-96) and every wrapper keeps min-h-0
-    // /min-w-0 so Recharts' ResponsiveContainer can't ratchet the layout
-    // wider on each resize (the old lockdown fix, retained).
     <div className="h-full w-full flex flex-col p-4 md:p-6 overflow-y-auto min-w-0">
       <DashboardHeader
         locations={locationsQuery.data ?? []}
@@ -237,94 +243,181 @@ function BoreholeGrid({ borehole }: { borehole: Borehole }) {
   const flowSensor = sensors.find((s) => s.type === "flow_meter")
 
   return (
-    <div className="flex flex-col gap-4 md:gap-6 animate-in fade-in duration-300 min-w-0">
-      {/* KPI strip — quick-glance summaries at the top of the scroll.
-          items-start lets compact cards stay compact (default grid
-          stretches to the tallest sibling, which leaves ugly dead space
-          when the water-level or weather card is empty). */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 min-w-0 items-start">
-        <LatestLevelKpi
-          boreholeId={boreholeId}
-          pressureSensor={pressureSensor}
-          sensorsPending={sensorsQuery.isPending}
-          criticalLow={borehole.critical_low_level}
-          optimalHigh={borehole.optimal_high_level}
-        />
-        {boreholeId !== undefined && (
-          <PumpControlCard boreholeId={boreholeId} />
-        )}
-        {boreholeId !== undefined && (
-          <LatestPumpWindowTile boreholeId={boreholeId} />
-        )}
-        <WeatherStrip locationId={borehole.location_id ?? undefined} />
+    <div className="flex flex-col gap-5 md:gap-6 animate-in fade-in duration-300 min-w-0">
+      {/* ── Status strip ── */}
+      <StatusStrip
+        boreholeId={boreholeId}
+        pressureSensor={pressureSensor}
+        sensorsPending={sensorsQuery.isPending}
+        criticalLow={borehole.critical_low_level}
+        optimalHigh={borehole.optimal_high_level}
+        locationId={borehole.location_id ?? undefined}
+      />
+
+      {/* ── Section: Live status ── */}
+      <div className="flex flex-col gap-4">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50 pl-0.5">
+          Live status
+        </p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 min-w-0 items-stretch">
+          <div className="flex flex-col min-w-0 lg:col-span-4 lg:h-full">
+            <CylinderCard
+              borehole={borehole}
+              boreholeId={boreholeId}
+              pressureSensor={pressureSensor}
+              sensorsPending={sensorsQuery.isPending}
+            />
+          </div>
+          <div className="flex flex-col min-w-0 lg:col-span-8 lg:h-full">
+            <ChartCard
+              title="Water level (24h)"
+              subtitle="Recent readings from the pressure transducer"
+              stretch
+              viewHref={
+                pressureSensor && boreholeId !== undefined
+                  ? `/boreholes/${boreholeId}/sensors/${pressureSensor.id}`
+                  : undefined
+              }
+            >
+              <WaterLevelOverviewBody
+                boreholeId={boreholeId}
+                sensor={pressureSensor}
+                sensorsPending={sensorsQuery.isPending}
+                criticalLow={borehole.critical_low_level}
+                optimalHigh={borehole.optimal_high_level}
+              />
+            </ChartCard>
+          </div>
+        </div>
       </div>
 
-      {/* Row 2: cylinder + Water level 24h chart, side by side. They're
-          naturally coupled (the visual + its recent history) and their
-          heights match — no more orphan empty space in a left column. */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 min-w-0">
-        <div className="flex flex-col min-w-0 lg:col-span-4">
-          <CylinderCard
-            borehole={borehole}
+      {/* ── Section: Analysis ── */}
+      <div
+        className="flex flex-col gap-4 -mx-4 md:-mx-6 px-4 md:px-6 py-5 -my-1"
+        style={{
+          background: "rgba(18, 39, 48, 0.4)",
+          borderTop: "1px solid rgba(30, 55, 66, 0.5)",
+          borderBottom: "1px solid rgba(30, 55, 66, 0.5)",
+        }}
+      >
+        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50 pl-0.5">
+          Analysis
+        </p>
+
+        <ChartCard
+          title="Predicted vs actual (24h)"
+          subtitle="Model forecast overlaid on real readings"
+          legend={
+            <div className="flex gap-4">
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="w-4 h-0 border-t-2 border-primary inline-block" />
+                Actual
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="w-4 h-0 border-t-[1.5px] border-dashed border-primary/60 inline-block" />
+                Predicted
+              </span>
+            </div>
+          }
+        >
+          <PredictionsOverviewBody
             boreholeId={boreholeId}
-            pressureSensor={pressureSensor}
+            criticalLow={borehole.critical_low_level}
+            optimalHigh={borehole.optimal_high_level}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Flow (24h)"
+          subtitle="Abstraction rate from the flow meter"
+          viewHref={
+            flowSensor && boreholeId !== undefined
+              ? `/boreholes/${boreholeId}/sensors/${flowSensor.id}`
+              : undefined
+          }
+        >
+          <FlowOverviewBody
+            boreholeId={boreholeId}
+            sensor={flowSensor}
             sensorsPending={sensorsQuery.isPending}
           />
-        </div>
-        <div className="flex flex-col min-w-0 lg:col-span-8">
-          <ChartCard
-            title="Water level (24h)"
-            viewHref={
-              pressureSensor && boreholeId !== undefined
-                ? `/boreholes/${boreholeId}/sensors/${pressureSensor.id}`
-                : undefined
-            }
-          >
-            <WaterLevelOverviewBody
-              boreholeId={boreholeId}
-              sensor={pressureSensor}
-              sensorsPending={sensorsQuery.isPending}
-              criticalLow={borehole.critical_low_level}
-              optimalHigh={borehole.optimal_high_level}
-            />
-          </ChartCard>
-        </div>
+        </ChartCard>
       </div>
-
-      {/* Row 3: predictions, full width — deserves the horizontal space
-          for the dashed-predicted vs solid-actual story. No deeper view
-          yet, so no viewHref. */}
-      <ChartCard
-        title="Predicted vs actual (24h)"
-        subtitle="Model forecast overlaid on real readings. Dashed = predicted, solid = actual."
-      >
-        <PredictionsOverviewBody
-          boreholeId={boreholeId}
-          criticalLow={borehole.critical_low_level}
-          optimalHigh={borehole.optimal_high_level}
-        />
-      </ChartCard>
-
-      {/* Row 4: flow, full width */}
-      <ChartCard
-        title="Flow (24h)"
-        viewHref={
-          flowSensor && boreholeId !== undefined
-            ? `/boreholes/${boreholeId}/sensors/${flowSensor.id}`
-            : undefined
-        }
-      >
-        <FlowOverviewBody
-          boreholeId={boreholeId}
-          sensor={flowSensor}
-          sensorsPending={sensorsQuery.isPending}
-        />
-      </ChartCard>
     </div>
   )
 }
 
-function LatestLevelKpi({
+// ─── Status strip ────────────────────────────────────────────────────────────
+
+function StatusStrip({
+  boreholeId,
+  pressureSensor,
+  sensorsPending,
+  criticalLow,
+  optimalHigh,
+  locationId,
+}: {
+  boreholeId: number | undefined
+  pressureSensor: SensorPublic | undefined
+  sensorsPending: boolean
+  criticalLow: number
+  optimalHigh: number
+  locationId: number | undefined
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-xl border border-border overflow-hidden bg-card min-w-0">
+      <WaterLevelCell
+        boreholeId={boreholeId}
+        pressureSensor={pressureSensor}
+        sensorsPending={sensorsPending}
+        criticalLow={criticalLow}
+        optimalHigh={optimalHigh}
+      />
+      <PumpStatusCell boreholeId={boreholeId} />
+      <PumpRunCell boreholeId={boreholeId} />
+      <WeatherCell locationId={locationId} />
+    </div>
+  )
+}
+
+function StatusCell({
+  label,
+  accent,
+  children,
+  className,
+}: {
+  label: string
+  accent?: "primary" | "destructive" | "warning"
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={cn(
+        "relative px-4 py-3.5 flex flex-col gap-1.5 border-b sm:border-b-0 sm:border-r border-border/70 last:border-r-0 last:border-b-0",
+        className,
+      )}
+    >
+      {accent && (
+        <div
+          className={cn(
+            "absolute top-0 left-0 right-0 h-0.5",
+            accent === "primary" && "bg-primary",
+            accent === "destructive" && "bg-destructive",
+            accent === "warning" && "bg-warning",
+          )}
+        />
+      )}
+      <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
+  )
+}
+
+function WaterLevelCell({
   boreholeId,
   pressureSensor,
   sensorsPending,
@@ -347,71 +440,289 @@ function LatestLevelKpi({
   const latest: WaterLevelReading | undefined = latestQuery.data?.items[0]
   const level = latest?.water_level ?? null
 
-  const stateLabel = level === null
-    ? null
-    : level < criticalLow
-      ? { text: "Critical", className: "bg-destructive/15 text-destructive" }
-      : level >= optimalHigh
-        ? { text: "Optimal", className: "bg-primary/15 text-primary" }
-        : { text: "Below optimal", className: "bg-secondary text-muted-foreground" }
+  const isPending = sensorsPending || (pressureSensor && latestQuery.isPending)
 
-  if (sensorsPending || (pressureSensor && latestQuery.isPending)) {
+  if (isPending) {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="font-heading text-xl">Water level</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-24" />
-          <Skeleton className="h-3 w-32" />
-        </CardContent>
-      </Card>
+      <StatusCell label="Water level">
+        <Skeleton className="h-6 w-20" />
+        <Skeleton className="h-3 w-28" />
+      </StatusCell>
     )
   }
 
-  if (!pressureSensor) {
+  if (!pressureSensor || level === null) {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="font-heading text-xl">Water level</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            No pressure transducer installed.
-          </p>
-        </CardContent>
-      </Card>
+      <StatusCell label="Water level">
+        <span className="text-sm text-muted-foreground">No sensor data</span>
+      </StatusCell>
+    )
+  }
+
+  const state =
+    level < criticalLow
+      ? { text: "Critical", accent: "destructive" as const, badge: "bg-destructive/15 text-destructive" }
+      : level >= optimalHigh
+        ? { text: "Optimal", accent: "primary" as const, badge: "bg-primary/15 text-primary" }
+        : { text: "Below optimal", accent: "warning" as const, badge: "bg-warning/15 text-warning" }
+
+  return (
+    <StatusCell label="Water level" accent={state.accent}>
+      <div className="flex items-baseline gap-1">
+        <span className="text-2xl font-medium [font-variant-numeric:tabular-nums] text-foreground">
+          {level.toFixed(2)}
+        </span>
+        <span className="text-[11px] text-muted-foreground">m</span>
+      </div>
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium w-fit",
+          state.badge,
+        )}
+      >
+        ● {state.text}
+      </span>
+      <span className="text-[10px] text-muted-foreground/60 [font-variant-numeric:tabular-nums]">
+        {latest ? `As of ${formatShortTs(latest.captured_at)}` : "—"}
+      </span>
+    </StatusCell>
+  )
+}
+
+function PumpStatusCell({ boreholeId }: { boreholeId: number | undefined }) {
+  const query = usePump(boreholeId)
+  const change = useChangePumpStatus(boreholeId!)
+  const [confirmingTo, setConfirmingTo] = useState<PumpStatus | null>(null)
+
+  if (query.isPending) {
+    return (
+      <StatusCell label="Pump status">
+        <Skeleton className="h-5 w-20" />
+        <Skeleton className="h-3 w-36" />
+      </StatusCell>
+    )
+  }
+
+  if (query.isError || !query.data) {
+    return (
+      <StatusCell label="Pump status">
+        <span className="text-sm text-muted-foreground">No pump</span>
+      </StatusCell>
+    )
+  }
+
+  const pump = query.data
+  const nextStatus: PumpStatus = pump.status === "on" ? "off" : "on"
+
+  const onConfirm = () => {
+    if (confirmingTo === null) return
+    change.mutate(confirmingTo, {
+      onSuccess: (res) => {
+        toast.success(
+          `Pump ${res.pump.status === "on" ? "turned on" : "turned off"}`,
+        )
+        setConfirmingTo(null)
+      },
+      onError: (err) => {
+        const msg =
+          err instanceof ApiError ? err.message : "Couldn't change pump status"
+        toast.error(msg)
+      },
+    })
+  }
+
+  const since = pump.last_status_change
+    ? relativeTime(pump.last_status_change)
+    : "—"
+
+  return (
+    <>
+      <StatusCell label="Pump status">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={pump.status === "on"}
+            aria-label={
+              pump.status === "on" ? "Turn pump off" : "Turn pump on"
+            }
+            disabled={change.isPending}
+            onClick={() => setConfirmingTo(nextStatus)}
+            className={cn(
+              "relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+              pump.status === "on" ? "bg-primary" : "bg-border",
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200",
+                pump.status === "on" ? "translate-x-6" : "translate-x-1",
+              )}
+            />
+          </button>
+          <span
+            className={cn(
+              "text-[11px] font-medium",
+              pump.status === "on" ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            {pump.status === "on" ? "ON" : "OFF"}
+          </span>
+        </div>
+        <span className="text-[10px] text-muted-foreground/60 [font-variant-numeric:tabular-nums]">
+          Since {since} · {pump.power_rating} kW · {pump.depth}m
+        </span>
+      </StatusCell>
+
+      <Dialog
+        open={confirmingTo !== null}
+        onOpenChange={(open) => {
+          if (!open && !change.isPending) setConfirmingTo(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmingTo === "on" ? "Turn pump ON?" : "Turn pump OFF?"}
+            </DialogTitle>
+            <DialogDescription>
+              This sends a command to the physical pump. It will be recorded
+              in the pump history as a manual override.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmingTo(null)}
+              disabled={change.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={confirmingTo === "off" ? "outline" : "default"}
+              onClick={onConfirm}
+              disabled={change.isPending}
+            >
+              {change.isPending
+                ? "Sending…"
+                : confirmingTo === "on"
+                  ? "Turn ON"
+                  : "Turn OFF"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+function PumpRunCell({ boreholeId }: { boreholeId: number | undefined }) {
+  const query = usePumpWindows(boreholeId)
+
+  if (query.isPending) {
+    return (
+      <StatusCell label="Latest pump run">
+        <Skeleton className="h-6 w-24" />
+        <Skeleton className="h-3 w-36" />
+      </StatusCell>
+    )
+  }
+
+  if (query.isError || !query.data?.[0]) {
+    return (
+      <StatusCell label="Latest pump run">
+        <span className="text-sm text-muted-foreground">No runs yet</span>
+      </StatusCell>
+    )
+  }
+
+  const latest = query.data[0]
+
+  return (
+    <StatusCell label="Latest pump run">
+      <div className="flex items-baseline gap-1">
+        <span className="text-2xl font-medium [font-variant-numeric:tabular-nums] text-foreground">
+          {formatVolume(latest.volume_litres)}
+        </span>
+        <span className="text-[11px] text-muted-foreground">L</span>
+      </div>
+      <span className="text-[10px] text-muted-foreground/60 [font-variant-numeric:tabular-nums]">
+        {formatDuration(latest.duration_min)} · {latest.avg_rate.toFixed(1)} L/min
+        avg
+      </span>
+      <span className="text-[10px] text-muted-foreground/60 [font-variant-numeric:tabular-nums]">
+        Started {formatShortTs(latest.start)}
+      </span>
+    </StatusCell>
+  )
+}
+
+function WeatherCell({
+  locationId,
+}: {
+  locationId: number | undefined
+}) {
+  const query = useWeatherSeries(locationId)
+
+  const latest = useMemo<Weather | null>(() => {
+    if (!query.data || query.data.length === 0) return null
+    return query.data[query.data.length - 1]
+  }, [query.data])
+
+  if (query.isPending) {
+    return (
+      <StatusCell label="Weather">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-3 w-24" />
+      </StatusCell>
+    )
+  }
+
+  if (query.isError || !latest) {
+    return (
+      <StatusCell label="Weather">
+        <span className="text-sm text-muted-foreground">No data</span>
+      </StatusCell>
     )
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <div className="w-full flex items-start justify-between gap-3">
-          <CardTitle className="font-heading text-xl">Water level</CardTitle>
-          {stateLabel && (
-            <span
-              className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${stateLabel.className}`}
-            >
-              {stateLabel.text}
-            </span>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-1">
-        <p className="flex items-baseline gap-1.5">
-          <span className="text-3xl [font-variant-numeric:tabular-nums] text-foreground">
-            {level !== null ? level.toFixed(2) : "—"}
-          </span>
-          <span className="text-xs text-muted-foreground">m</span>
-        </p>
-        <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground [font-variant-numeric:tabular-nums]">
-          {latest ? `As of ${formatShortTs(latest.captured_at)}` : "—"}
-        </p>
-      </CardContent>
-    </Card>
+    <StatusCell label="Weather">
+      <div className="flex items-center gap-4 flex-wrap">
+        <WeatherStat label="Temp" value={fmt(latest.temperature, 1)} unit="°C" />
+        <WeatherStat label="Humidity" value={fmt(latest.humidity, 0)} unit="%" />
+        <WeatherStat label="Rain" value={fmt(latest.precipitation, 1)} unit="mm" />
+      </div>
+      <span className="text-[10px] text-muted-foreground/60 [font-variant-numeric:tabular-nums]">
+        {formatWhen(latest.created_at)}
+      </span>
+    </StatusCell>
   )
 }
+
+function WeatherStat({
+  label,
+  value,
+  unit,
+}: {
+  label: string
+  value: string
+  unit: string
+}) {
+  return (
+    <div className="flex flex-col leading-tight">
+      <span className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground/70">
+        {label}
+      </span>
+      <span className="text-[13px] [font-variant-numeric:tabular-nums]">
+        {value}
+        <span className="text-muted-foreground ml-0.5">{unit}</span>
+      </span>
+    </div>
+  )
+}
+
+// ─── Chart cards ─────────────────────────────────────────────────────────────
 
 function CylinderCard({
   borehole,
@@ -438,22 +749,30 @@ function CylinderCard({
   const isPending = sensorsPending || (hasSensor && latestQuery.isPending)
 
   return (
-    <Card className="w-full flex flex-col overflow-hidden">
-      <CardHeader className="shrink-0">
-        <CardTitle className="font-heading text-xl">Water level</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Where the water sits inside the borehole right now.
+    <div
+      className="w-full flex flex-col overflow-hidden rounded-xl border border-border lg:h-full"
+      style={{
+        background:
+          "linear-gradient(160deg, var(--color-card) 0%, rgba(18,39,48,0.6) 100%)",
+      }}
+    >
+      <div className="px-4 pt-4 pb-1.5">
+        <div className="font-heading text-base font-medium leading-snug">
+          Water level
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Where the water sits right now
         </p>
-      </CardHeader>
-      <CardContent className="flex flex-col">
+      </div>
+      <div className="flex-1 flex flex-col">
         {!hasSensor && !sensorsPending ? (
-          <div className="h-72 md:h-96 flex items-center justify-center text-center">
+          <div className="h-72 md:h-80 lg:flex-1 flex items-center justify-center text-center px-4">
             <p className="text-sm text-muted-foreground">
               No pressure transducer installed on this borehole yet.
             </p>
           </div>
         ) : (
-          <div className="h-72 md:h-96 flex items-center justify-center min-h-0 min-w-0">
+          <div className="h-72 md:h-80 flex items-center justify-center min-h-0 min-w-0 px-2">
             <BoreholeCylinder
               totalDepth={borehole.total_depth}
               criticalLow={borehole.critical_low_level}
@@ -464,42 +783,44 @@ function CylinderCard({
           </div>
         )}
         {latest && (
-          <p className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-muted-foreground text-center mt-3 [font-variant-numeric:tabular-nums]">
+          <p className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-muted-foreground text-center pb-3 [font-variant-numeric:tabular-nums]">
             As of {formatShortTs(latest.captured_at)}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
 /**
  * Fixed-height chart card. Load-bearing invariants:
- *   - `h-80 md:h-96` gives ResponsiveContainer a definite parent height.
+ *   - `h-72 md:h-80` gives ResponsiveContainer a definite parent height.
  *   - `overflow-hidden` clips any layout thrash during resize.
  *   - `min-h-0 min-w-0` on the card AND on the CardContent stops the
  *     ratcheting bug where Recharts' ResponsiveContainer measures its
  *     own dimensions and the grid grows on every layout pass.
  * Do NOT remove min-h-0 / min-w-0 even though the dashboard now scrolls.
- *
- * `viewHref` renders a discreet "View history →" link in the header —
- * cheap drill-in from summary card to the sensor-detail deep dive (with
- * range controls + overlays) rather than making users navigate five
- * levels through the Locations tree.
  */
 function ChartCard({
   title,
   subtitle,
   viewHref,
+  legend,
+  stretch,
   children,
 }: {
   title: string
   subtitle?: string
   viewHref?: string
+  legend?: React.ReactNode
+  stretch?: boolean
   children: React.ReactNode
 }) {
   return (
-    <Card className="w-full flex flex-col overflow-hidden h-80 md:h-96 min-h-0 min-w-0">
+    <Card className={cn(
+      "w-full flex flex-col overflow-hidden min-h-0 min-w-0",
+      stretch ? "h-full" : "h-72 md:h-80",
+    )}>
       <CardHeader className="shrink-0">
         <div className="w-full flex items-start justify-between gap-3">
           <div className="min-w-0 flex flex-col gap-1">
@@ -518,12 +839,17 @@ function ChartCard({
           )}
         </div>
       </CardHeader>
+      {legend && (
+        <div className="px-4 pb-3 -mt-2">{legend}</div>
+      )}
       <CardContent className="flex-1 flex flex-col min-h-0 min-w-0">
         {children}
       </CardContent>
     </Card>
   )
 }
+
+// ─── Chart bodies ────────────────────────────────────────────────────────────
 
 function WaterLevelOverviewBody({
   boreholeId,
@@ -731,6 +1057,8 @@ function OverviewChartArea({
   )
 }
 
+// ─── Gate / empty states ─────────────────────────────────────────────────────
+
 function LocationGate({
   locationsPending,
   hasLocation,
@@ -783,10 +1111,14 @@ function LocationGate({
 function EmptyBlock({ text }: { text: string }) {
   return (
     <div className="rounded-xl border border-border/70 bg-card/40 p-10 text-center flex items-center justify-center">
-      <p className="text-muted-foreground text-sm max-w-prose mx-auto">{text}</p>
+      <p className="text-muted-foreground text-sm max-w-prose mx-auto">
+        {text}
+      </p>
     </div>
   )
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function numOrUndef(v: string | null): number | undefined {
   if (v === null || v === "") return undefined
@@ -803,3 +1135,50 @@ function formatShortTs(iso: string): string {
     minute: "2-digit",
   })
 }
+
+function formatVolume(litres: number): string {
+  return Math.round(litres).toLocaleString()
+}
+
+function formatDuration(mins: number): string {
+  if (mins < 60) return `${mins.toFixed(0)} min`
+  const h = Math.floor(mins / 60)
+  const m = Math.round(mins - h * 60)
+  return m === 0 ? `${h}h` : `${h}h ${m}m`
+}
+
+function relativeTime(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  if (sameDay) {
+    return d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function fmt(v: number | null | undefined, digits: number): string {
+  if (v === null || v === undefined) return "—"
+  return v.toFixed(digits)
+}
+
+function formatWhen(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+

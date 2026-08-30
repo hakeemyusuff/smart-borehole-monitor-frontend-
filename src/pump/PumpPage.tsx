@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { useBoreholes } from "@/boreholes/queries"
 import { useLocations } from "@/locations/queries"
@@ -11,7 +11,6 @@ import { NewPumpDialog } from "@/pump/NewPumpDialog"
 import type { Borehole } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { PageShell } from "@/components/PageShell"
 import {
   Select,
   SelectContent,
@@ -20,19 +19,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
+
+type PumpTab = "transitions" | "runs"
 
 /**
- * Top-level Pump page. Cascading Location -> Borehole selectors mirror
- * the Data logs pattern; body swaps between install prompt (no pump
- * yet) and full pump surface (control + latest run + history + windows)
- * once one is installed.
- *
- * Selectors are URL-persisted via ?location=&borehole= so the borehole
- * summary card on BoreholeDetailPage can link here with the right
- * scope preselected.
+ * Top-level Pump page. Locked viewport on lg+ (like Data logs) so only
+ * the selected table scrolls internally instead of the whole page.
+ * Selectors sit inline with the page title (right side) and Transitions
+ * / Runs are a tab switch below the control cards — no more long
+ * scroll through stacked panels.
  */
 export function PumpPage() {
   const [params, setParams] = useSearchParams()
+  const [tab, setTab] = useState<PumpTab>("transitions")
   const locationId = numOrUndef(params.get("location"))
   const boreholeId = numOrUndef(params.get("borehole"))
 
@@ -81,21 +81,16 @@ export function PumpPage() {
   }, [locationId, boreholeId, boreholesInLocation, setParams])
 
   return (
-    <PageShell>
-      <section className="flex flex-col gap-8">
-        <header className="flex flex-col gap-1">
+    <div className="h-full w-full flex flex-col p-4 md:p-6 overflow-y-auto lg:overflow-hidden min-w-0">
+      <header className="shrink-0 flex items-end justify-between gap-4 flex-wrap mb-4 md:mb-6">
+        <div className="flex flex-col gap-1 min-w-0">
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Pump
           </p>
           <h1 className="text-3xl md:text-4xl font-medium">Control</h1>
-          <p className="text-muted-foreground text-sm mt-1 max-w-prose">
-            Install and manage the pump on any borehole. Manual overrides
-            drive the physical pump — every change is logged in the
-            transitions table below.
-          </p>
-        </header>
+        </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
+        <div className="flex items-end gap-3 flex-wrap">
           <SelectorField label="Location">
             <Select
               value={locationId !== undefined ? String(locationId) : undefined}
@@ -111,7 +106,7 @@ export function PumpPage() {
                 (locationsQuery.data ?? []).length === 0
               }
             >
-              <SelectTrigger className="w-full sm:w-56">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Choose a location" />
               </SelectTrigger>
               <SelectContent>
@@ -139,7 +134,7 @@ export function PumpPage() {
                 boreholesInLocation.length === 0
               }
             >
-              <SelectTrigger className="w-full sm:w-56">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Choose a borehole" />
               </SelectTrigger>
               <SelectContent>
@@ -152,7 +147,9 @@ export function PumpPage() {
             </Select>
           </SelectorField>
         </div>
+      </header>
 
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col">
         <SelectionGate
           locationsPending={locationsQuery.isPending}
           hasAnyLocation={(locationsQuery.data ?? []).length > 0}
@@ -160,27 +157,36 @@ export function PumpPage() {
           boreholesPending={boreholesQuery.isPending}
           hasBoreholes={boreholesInLocation.length > 0}
         >
-          {boreholeId !== undefined && <PumpBody boreholeId={boreholeId} />}
+          {boreholeId !== undefined && (
+            <PumpBody boreholeId={boreholeId} tab={tab} setTab={setTab} />
+          )}
         </SelectionGate>
-      </section>
-    </PageShell>
+      </div>
+    </div>
   )
 }
 
-function PumpBody({ boreholeId }: { boreholeId: number }) {
+function PumpBody({
+  boreholeId,
+  tab,
+  setTab,
+}: {
+  boreholeId: number
+  tab: PumpTab
+  setTab: (t: PumpTab) => void
+}) {
   const query = usePump(boreholeId)
 
   if (query.isPending) {
     return (
       <div className="flex flex-col gap-4">
         <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
       </div>
     )
   }
 
   if (!query.data) {
-    // 404 handled inside usePump — data === null means "no pump yet".
     return (
       <Card className="w-full">
         <CardHeader>
@@ -205,13 +211,71 @@ function PumpBody({ boreholeId }: { boreholeId: number }) {
   }
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-300">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="flex flex-col gap-4 md:gap-6 animate-in fade-in duration-300 lg:flex-1 lg:min-h-0 lg:min-w-0">
+      {/* Control + latest run, static above the tabbed table. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
         <PumpControlCard boreholeId={boreholeId} />
         <LatestPumpWindowTile boreholeId={boreholeId} />
       </div>
-      <PumpHistoryPanel boreholeId={boreholeId} />
-      <PumpWindowsPanel boreholeId={boreholeId} />
+
+      {/* Tab bar. */}
+      <div className="shrink-0">
+        <TabBar tab={tab} onChange={setTab} />
+      </div>
+
+      {/* Only the selected table renders — makes the page feel focused
+          instead of stacking two long lists. lg+ locks the panel to
+          fill the remaining space so the table body scrolls with a
+          sticky thead. */}
+      <div className="flex flex-col lg:flex-1 lg:min-h-0 lg:min-w-0">
+        {tab === "transitions" ? (
+          <PumpHistoryPanel boreholeId={boreholeId} hideHeader />
+        ) : (
+          <PumpWindowsPanel boreholeId={boreholeId} hideHeader />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TabBar({
+  tab,
+  onChange,
+}: {
+  tab: PumpTab
+  onChange: (t: PumpTab) => void
+}) {
+  const OPTIONS: { value: PumpTab; label: string }[] = [
+    { value: "transitions", label: "Transitions" },
+    { value: "runs", label: "Runs" },
+  ]
+  return (
+    <div
+      role="tablist"
+      aria-label="Pump records"
+      className="inline-flex items-center rounded-lg border border-border bg-card p-0.5"
+    >
+      {OPTIONS.map((opt) => {
+        const isActive = tab === opt.value
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              "px-3 py-1 text-xs rounded-md transition-colors duration-150 outline-none",
+              "focus-visible:ring-2 focus-visible:ring-ring/50",
+              isActive
+                ? "bg-primary/15 text-primary font-medium"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

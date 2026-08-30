@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { usePump, useChangePumpStatus } from "@/pump/queries"
 import type { Pump, PumpStatus } from "@/lib/types"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -91,20 +92,43 @@ export function PumpControlCard({ boreholeId }: { boreholeId: number }) {
   return (
     <Card className="w-full">
       <CardHeader>
-        <div className="w-full flex items-start justify-between gap-4">
+        <div className="w-full flex items-center justify-between gap-4">
           <CardTitle className="font-heading text-xl">Pump status</CardTitle>
-          <StatusPill status={pump.status} />
+          {/* The switch stays at the CURRENT status until the user confirms
+              the change. Clicking opens the confirmation dialog; the
+              onCheckedChange never runs directly against the mutation. */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={pump.status === "on"}
+              aria-label={
+                pump.status === "on" ? "Turn pump off" : "Turn pump on"
+              }
+              disabled={change.isPending}
+              onClick={() => setConfirmingTo(nextStatus)}
+              className={cn(
+                "relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+                pump.status === "on" ? "bg-primary" : "bg-border",
+              )}
+            >
+              <span
+                className={cn(
+                  "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200",
+                  pump.status === "on" ? "translate-x-6" : "translate-x-1",
+                )}
+              />
+            </button>
+            <span
+              className={`text-[10px] uppercase tracking-[0.16em] font-medium [font-variant-numeric:tabular-nums] ${pump.status === "on" ? "text-primary" : "text-muted-foreground"}`}
+            >
+              {pump.status === "on" ? "ON" : "OFF"}
+            </span>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <PumpMeta pump={pump} />
-        <Button
-          size="sm"
-          variant={pump.status === "on" ? "outline" : "default"}
-          onClick={() => setConfirmingTo(nextStatus)}
-        >
-          {pump.status === "on" ? "Turn pump OFF" : "Turn pump ON"}
-        </Button>
       </CardContent>
 
       <Dialog
@@ -146,26 +170,6 @@ export function PumpControlCard({ boreholeId }: { boreholeId: number }) {
         </DialogContent>
       </Dialog>
     </Card>
-  )
-}
-
-function StatusPill({ status }: { status: PumpStatus }) {
-  if (status === "on") {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
-        <span
-          className="size-1.5 rounded-full bg-primary animate-pulse"
-          aria-hidden
-        />
-        ON
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
-      <span className="size-1.5 rounded-full bg-muted-foreground/70" aria-hidden />
-      OFF
-    </span>
   )
 }
 

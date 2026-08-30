@@ -173,8 +173,8 @@ export function WaterLevelChart({
             <Bar
               yAxisId="rain"
               dataKey="rain"
-              fill="var(--muted-foreground)"
-              fillOpacity={0.35}
+              fill="#5B9BD5"
+              fillOpacity={0.25}
               isAnimationActive={false}
               maxBarSize={12}
             />
