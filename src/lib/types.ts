@@ -169,3 +169,33 @@ export type ChartPoint = {
   t: string
   value: number | null
 }
+
+// Predicted-vs-actual water level from the ML model. `actual` is null for
+// still-future points or when the paired reading is missing; `predicted`
+// and `confidence` are always present. `confidence` is a 0..1 inter-tree
+// agreement heuristic — render as a percentage in tooltips only; do NOT
+// treat it as a ±metre band, it isn't calibrated.
+export type PredictionChartPoint = {
+  t: string
+  predicted: number
+  actual: number | null
+  confidence: number
+}
+
+// One pump event: start → end, with the totalled abstraction volume,
+// duration and average rate. Order isn't guaranteed by the contract, so
+// callers must sort by `start` descending for newest-first.
+export type PumpWindow = {
+  start: string
+  end: string
+  volume_litres: number
+  duration_min: number
+  avg_rate: number
+}
+
+// Hourly rain series bounded to the requested range. Backfills the weather
+// overlay on the sensor water-level chart.
+export type RainChartPoint = {
+  t: string
+  precipitation: number
+}

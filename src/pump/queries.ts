@@ -12,6 +12,7 @@ import type {
   PumpHistory,
   PumpStatus,
   PumpStatusChangeResponse,
+  PumpWindow,
   StatusChange,
 } from "@/lib/types"
 
@@ -20,6 +21,7 @@ export const pumpKeys = {
   history: (boreholeId: number, skip: number, limit: number) =>
     ["pump-history", boreholeId, skip, limit] as const,
   historyAll: (boreholeId: number) => ["pump-history", boreholeId] as const,
+  windows: (boreholeId: number) => ["pump-windows", boreholeId] as const,
 }
 
 export function usePump(boreholeId: number | undefined) {
@@ -56,6 +58,28 @@ export function usePumpHistoryPage(
       api.get<PaginatedEnvelope<PumpHistory>>(
         `/api/pumps/pump-histories/${boreholeId}?skip=${skip}&limit=${limit}`,
       ),
+    enabled,
+    ...liveQueryOptions,
+  })
+}
+
+/**
+ * GET /api/pumps/{borehole_id}/pump-windows returns one entry per pumping
+ * event. Order isn't guaranteed by the contract — we sort by start descending
+ * so callers can trust index 0 = latest.
+ */
+export function usePumpWindows(boreholeId: number | undefined) {
+  const enabled = boreholeId !== undefined
+  return useQuery({
+    queryKey: enabled ? pumpKeys.windows(boreholeId) : ["pump-windows", "unknown"],
+    queryFn: async () => {
+      const raw = await api.get<PumpWindow[]>(
+        `/api/pumps/${boreholeId}/pump-windows`,
+      )
+      return [...raw].sort(
+        (a, b) => new Date(b.start).getTime() - new Date(a.start).getTime(),
+      )
+    },
     enabled,
     ...liveQueryOptions,
   })

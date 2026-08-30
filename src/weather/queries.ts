@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api"
-import type { Weather } from "@/lib/types"
+import type { ChartRange, RainChartPoint, Weather } from "@/lib/types"
 
 export const weatherKeys = {
   forLocation: (locationId: number) => ["weather", locationId] as const,
+  chart: (locationId: number, range: ChartRange) =>
+    ["weather", "chart", locationId, range] as const,
 }
 
 /**
@@ -19,6 +21,29 @@ export function useWeatherSeries(locationId: number | undefined) {
       ? weatherKeys.forLocation(locationId)
       : ["weather", "unknown"],
     queryFn: () => api.get<Weather[]>(`/api/weathers/${locationId}`),
+    enabled,
+  })
+}
+
+/**
+ * GET /api/weathers/{location_id}/chart?range_={day|week|month}
+ * Returns hourly rainfall bounded to the requested window — used to
+ * overlay recharge context on the sensor water-level chart. Same
+ * hourly cadence as the base weather series, so no live polling.
+ */
+export function useWeatherChart(
+  locationId: number | undefined,
+  range: ChartRange,
+) {
+  const enabled = locationId !== undefined
+  return useQuery({
+    queryKey: enabled
+      ? weatherKeys.chart(locationId, range)
+      : ["weather", "chart", "unknown", range],
+    queryFn: () =>
+      api.get<RainChartPoint[]>(
+        `/api/weathers/${locationId}/chart?range_=${range}`,
+      ),
     enabled,
   })
 }
