@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react"
-import { useSearchParams } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { useLocations } from "@/locations/queries"
 import { useBoreholes } from "@/boreholes/queries"
@@ -256,11 +256,11 @@ function BoreholeGrid({ borehole }: { borehole: Borehole }) {
         <WeatherStrip locationId={borehole.location_id ?? undefined} />
       </div>
 
-      {/* Main grid: cylinder (hero visual) on the left, charts stacked
-          on the right. Chart wrappers keep min-h-0/min-w-0 so
-          ResponsiveContainer never ratchets. */}
+      {/* Row 2: cylinder + Water level 24h chart, side by side. They're
+          naturally coupled (the visual + its recent history) and their
+          heights match — no more orphan empty space in a left column. */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 min-w-0">
-        <div className="flex flex-col gap-4 min-w-0 lg:col-span-4">
+        <div className="flex flex-col min-w-0 lg:col-span-4">
           <CylinderCard
             borehole={borehole}
             boreholeId={boreholeId}
@@ -268,9 +268,15 @@ function BoreholeGrid({ borehole }: { borehole: Borehole }) {
             sensorsPending={sensorsQuery.isPending}
           />
         </div>
-
-        <div className="flex flex-col gap-4 md:gap-6 min-w-0 lg:col-span-8">
-          <ChartCard title="Water level (24h)">
+        <div className="flex flex-col min-w-0 lg:col-span-8">
+          <ChartCard
+            title="Water level (24h)"
+            viewHref={
+              pressureSensor && boreholeId !== undefined
+                ? `/boreholes/${boreholeId}/sensors/${pressureSensor.id}`
+                : undefined
+            }
+          >
             <WaterLevelOverviewBody
               boreholeId={boreholeId}
               sensor={pressureSensor}
@@ -279,25 +285,38 @@ function BoreholeGrid({ borehole }: { borehole: Borehole }) {
               optimalHigh={borehole.optimal_high_level}
             />
           </ChartCard>
-          <ChartCard
-            title="Predicted vs actual (24h)"
-            subtitle="Model forecast overlaid on real readings. Dashed = predicted, solid = actual."
-          >
-            <PredictionsOverviewBody
-              boreholeId={boreholeId}
-              criticalLow={borehole.critical_low_level}
-              optimalHigh={borehole.optimal_high_level}
-            />
-          </ChartCard>
-          <ChartCard title="Flow (24h)">
-            <FlowOverviewBody
-              boreholeId={boreholeId}
-              sensor={flowSensor}
-              sensorsPending={sensorsQuery.isPending}
-            />
-          </ChartCard>
         </div>
       </div>
+
+      {/* Row 3: predictions, full width — deserves the horizontal space
+          for the dashed-predicted vs solid-actual story. No deeper view
+          yet, so no viewHref. */}
+      <ChartCard
+        title="Predicted vs actual (24h)"
+        subtitle="Model forecast overlaid on real readings. Dashed = predicted, solid = actual."
+      >
+        <PredictionsOverviewBody
+          boreholeId={boreholeId}
+          criticalLow={borehole.critical_low_level}
+          optimalHigh={borehole.optimal_high_level}
+        />
+      </ChartCard>
+
+      {/* Row 4: flow, full width */}
+      <ChartCard
+        title="Flow (24h)"
+        viewHref={
+          flowSensor && boreholeId !== undefined
+            ? `/boreholes/${boreholeId}/sensors/${flowSensor.id}`
+            : undefined
+        }
+      >
+        <FlowOverviewBody
+          boreholeId={boreholeId}
+          sensor={flowSensor}
+          sensorsPending={sensorsQuery.isPending}
+        />
+      </ChartCard>
     </div>
   )
 }
@@ -459,23 +478,42 @@ function CylinderCard({
  *     ratcheting bug where Recharts' ResponsiveContainer measures its
  *     own dimensions and the grid grows on every layout pass.
  * Do NOT remove min-h-0 / min-w-0 even though the dashboard now scrolls.
+ *
+ * `viewHref` renders a discreet "View history →" link in the header —
+ * cheap drill-in from summary card to the sensor-detail deep dive (with
+ * range controls + overlays) rather than making users navigate five
+ * levels through the Locations tree.
  */
 function ChartCard({
   title,
   subtitle,
+  viewHref,
   children,
 }: {
   title: string
   subtitle?: string
+  viewHref?: string
   children: React.ReactNode
 }) {
   return (
     <Card className="w-full flex flex-col overflow-hidden h-80 md:h-96 min-h-0 min-w-0">
       <CardHeader className="shrink-0">
-        <CardTitle className="font-heading text-xl">{title}</CardTitle>
-        {subtitle && (
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
-        )}
+        <div className="w-full flex items-start justify-between gap-3">
+          <div className="min-w-0 flex flex-col gap-1">
+            <CardTitle className="font-heading text-xl">{title}</CardTitle>
+            {subtitle && (
+              <p className="text-xs text-muted-foreground">{subtitle}</p>
+            )}
+          </div>
+          {viewHref && (
+            <Link
+              to={viewHref}
+              className="shrink-0 text-xs text-muted-foreground hover:text-primary transition-colors duration-150 whitespace-nowrap"
+            >
+              View history →
+            </Link>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 min-w-0">
         {children}
