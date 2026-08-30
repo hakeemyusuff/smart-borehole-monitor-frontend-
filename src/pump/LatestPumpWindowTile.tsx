@@ -81,9 +81,7 @@ export function LatestPumpWindowTile({
           <span className="text-2xl [font-variant-numeric:tabular-nums] text-foreground">
             {formatVolume(latest.volume_litres)}
           </span>
-          <span className="text-xs text-muted-foreground">
-            {latest.volume_litres < 1000 ? "L" : "L pumped"}
-          </span>
+          <span className="text-xs text-muted-foreground">litres pumped</span>
         </p>
         <p className="text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
           {formatDuration(latest.duration_min)} · {latest.avg_rate.toFixed(1)} L/min avg
@@ -93,13 +91,10 @@ export function LatestPumpWindowTile({
   )
 }
 
+// Full litres, locale-grouped ("3,098") — no kL shortening, so the tile
+// reads unambiguously next to its "litres pumped" label.
 function formatVolume(litres: number): string {
-  if (litres >= 1000) {
-    // 3097.9 L → "3.10 kL" reads nicer at a glance than a 5-digit litre
-    // number on a compact card.
-    return `${(litres / 1000).toFixed(2)} kL`
-  }
-  return litres.toFixed(0)
+  return Math.round(litres).toLocaleString()
 }
 
 function formatDuration(mins: number): string {

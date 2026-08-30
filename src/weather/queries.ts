@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { api } from "@/lib/api"
+import { api, ApiError } from "@/lib/api"
 import type { ChartRange, RainChartPoint, Weather } from "@/lib/types"
 
 export const weatherKeys = {
@@ -16,11 +16,21 @@ export const weatherKeys = {
  */
 export function useWeatherSeries(locationId: number | undefined) {
   const enabled = locationId !== undefined
-  return useQuery({
+  return useQuery<Weather[]>({
     queryKey: enabled
       ? weatherKeys.forLocation(locationId)
       : ["weather", "unknown"],
-    queryFn: () => api.get<Weather[]>(`/api/weathers/${locationId}`),
+    queryFn: async () => {
+      try {
+        return await api.get<Weather[]>(`/api/weathers/${locationId}`)
+      } catch (e) {
+        // Backend returns 404 when a location has no weather rows yet —
+        // treat as an empty series so the UI can render the standard
+        // "no data yet" empty state instead of a bare "Not Found".
+        if (e instanceof ApiError && e.status === 404) return []
+        throw e
+      }
+    },
     enabled,
   })
 }

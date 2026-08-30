@@ -2,13 +2,14 @@ import { useMemo } from "react"
 import { ApiError } from "@/lib/api"
 import { useWeatherSeries } from "@/weather/queries"
 import type { Weather } from "@/lib/types"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
 /**
- * Compact conditions strip for the Dashboard's left column. Reads
- * the location's weather series and shows the latest sample as
- * temperature / humidity / precipitation.
+ * Compact conditions card. Always renders the "Weather" header so the
+ * tile is identifiable even in pending / empty / error states — an
+ * anonymous "Not Found" card is worse than one that says "Weather —
+ * no data yet".
  */
 export function WeatherStrip({ locationId }: { locationId: number | undefined }) {
   const query = useWeatherSeries(locationId)
@@ -19,70 +20,77 @@ export function WeatherStrip({ locationId }: { locationId: number | undefined })
     return query.data[query.data.length - 1]
   }, [query.data])
 
-  if (query.isPending) {
-    return (
-      <Card className="w-full">
-        <CardContent>
-          <Skeleton className="h-10 w-full" />
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (query.isError) {
-    const msg =
-      query.error instanceof ApiError
-        ? query.error.message
-        : "Couldn't load weather."
-    return (
-      <Card className="w-full">
-        <CardContent>
-          <p className="text-xs text-muted-foreground">{msg}</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (!latest) {
-    return (
-      <Card className="w-full">
-        <CardContent>
-          <p className="text-xs text-muted-foreground text-center">
-            No weather data for this location yet.
-          </p>
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
     <Card className="w-full">
-      <CardContent className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-4 md:gap-6 flex-wrap">
-          <Stat
-            icon={<TempIcon />}
-            label="Temp"
-            value={fmt(latest.temperature, 1)}
-            unit="°C"
-          />
-          <Stat
-            icon={<HumidityIcon />}
-            label="Humidity"
-            value={fmt(latest.humidity, 0)}
-            unit="%"
-          />
-          <Stat
-            icon={<RainIcon />}
-            label="Rain"
-            value={fmt(latest.precipitation, 1)}
-            unit="mm"
-          />
+      <CardHeader>
+        <div className="w-full flex items-start justify-between gap-3">
+          <CardTitle className="font-heading text-xl">Weather</CardTitle>
+          {latest && (
+            <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 [font-variant-numeric:tabular-nums]">
+              {formatWhen(latest.created_at)}
+            </span>
+          )}
         </div>
-        <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 [font-variant-numeric:tabular-nums] shrink-0">
-          {formatWhen(latest.created_at)}
-        </p>
+      </CardHeader>
+      <CardContent>
+        <WeatherBody
+          isPending={query.isPending}
+          isError={query.isError}
+          error={query.error}
+          latest={latest}
+        />
       </CardContent>
     </Card>
+  )
+}
+
+function WeatherBody({
+  isPending,
+  isError,
+  error,
+  latest,
+}: {
+  isPending: boolean
+  isError: boolean
+  error: unknown
+  latest: Weather | null
+}) {
+  if (isPending) {
+    return <Skeleton className="h-10 w-full" />
+  }
+  if (isError) {
+    const msg =
+      error instanceof ApiError ? error.message : "Couldn't load weather."
+    return <p className="text-xs text-muted-foreground">{msg}</p>
+  }
+  if (!latest) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No weather data for this location yet.
+      </p>
+    )
+  }
+  return (
+    <div className="flex items-center gap-4 md:gap-6 flex-wrap">
+      <Stat
+        icon={<TempIcon />}
+        label="Temp"
+        value={fmt(latest.temperature, 1)}
+        unit="°C"
+      />
+      <Stat
+        icon={<HumidityIcon />}
+        label="Humidity"
+        value={fmt(latest.humidity, 0)}
+        unit="%"
+      />
+      <Stat
+        icon={<RainIcon />}
+        label="Rain"
+        value={fmt(latest.precipitation, 1)}
+        unit="mm"
+      />
+    </div>
   )
 }
 
