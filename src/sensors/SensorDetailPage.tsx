@@ -4,6 +4,7 @@ import { ApiError } from "@/lib/api"
 import { useBorehole } from "@/boreholes/queries"
 import { useSensor } from "@/sensors/queries"
 import { useFlowChart, useWaterLevelChart } from "@/readings/queries"
+import { useWeatherChart } from "@/weather/queries"
 import { FlowChart } from "@/readings/FlowChart"
 import { WaterLevelChart } from "@/readings/WaterLevelChart"
 import { sensorMeta } from "@/sensors/sensor-types"
@@ -71,6 +72,7 @@ export function SensorDetailPage() {
             <WaterLevelPanel
               boreholeId={boreholeId!}
               sensorId={sensorId!}
+              locationId={boreholeQuery.data?.location_id ?? undefined}
               criticalLow={boreholeQuery.data?.critical_low_level}
               optimalHigh={boreholeQuery.data?.optimal_high_level}
             />
@@ -155,17 +157,27 @@ function StatusBadge({ status }: { status: SensorStatus }) {
 function WaterLevelPanel({
   boreholeId,
   sensorId,
+  locationId,
   criticalLow,
   optimalHigh,
 }: {
   boreholeId: number
   sensorId: number
+  locationId?: number
   criticalLow?: number
   optimalHigh?: number
 }) {
   const [range, setRange] = useState<ChartRange>("day")
   const chartQuery = useWaterLevelChart(boreholeId, sensorId, range)
   const latest = latestNonNullValue(chartQuery.data)
+  // Rain overlay is only useful over Week/Month — a single day of hourly
+  // bars is too noisy for the recharge story. On Day view we pass no
+  // rainPoints, which turns the overlay off entirely.
+  const showRain = range === "week" || range === "month"
+  const rainQuery = useWeatherChart(
+    showRain ? locationId : undefined,
+    range,
+  )
 
   return (
     <Card className="w-full">
@@ -175,6 +187,9 @@ function WaterLevelPanel({
             <CardTitle className="font-heading text-xl">Water level</CardTitle>
             <p className="text-xs text-muted-foreground">
               Readings from this sensor over time.
+              {showRain && (
+                <> Grey bars show hourly rainfall for recharge context.</>
+              )}
             </p>
           </div>
           {latest !== null && <LatestReadout value={latest} unit="m" />}
@@ -191,6 +206,7 @@ function WaterLevelPanel({
               range={range}
               criticalLow={criticalLow}
               optimalHigh={optimalHigh}
+              rainPoints={showRain ? rainQuery.data : undefined}
             />
           )}
         />

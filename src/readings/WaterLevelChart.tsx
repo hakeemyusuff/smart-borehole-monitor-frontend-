@@ -1,19 +1,21 @@
 import { useId, useMemo } from "react"
 import {
   Area,
-  AreaChart,
+  Bar,
   CartesianGrid,
+  ComposedChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts"
-import type { ChartPoint, ChartRange } from "@/lib/types"
+import type { ChartPoint, ChartRange, RainChartPoint } from "@/lib/types"
 
 type Point = {
   t: number
   value: number | null
+  rain?: number
 }
 
 export function WaterLevelChart({
@@ -21,24 +23,42 @@ export function WaterLevelChart({
   range,
   criticalLow,
   optimalHigh,
+  rainPoints,
 }: {
   points: ChartPoint[]
   range: ChartRange
   criticalLow?: number
   optimalHigh?: number
+  // Optional recharge context. When provided, rain renders as bars on a
+  // secondary (right-hand) axis so "it rained → level rose" is visible
+  // without competing with the level line.
+  rainPoints?: RainChartPoint[]
 }) {
   const gradientId = useId()
 
-  const data = useMemo<Point[]>(
-    () =>
-      points
-        .map((p) => ({
-          t: new Date(p.t).getTime(),
-          value: p.value,
-        }))
-        .sort((a, b) => a.t - b.t),
-    [points],
-  )
+  const hasRain = !!rainPoints && rainPoints.length > 0
+
+  const data = useMemo<Point[]>(() => {
+    // Merge water level + optional rain into one series keyed by
+    // timestamp. Rain and level don't necessarily share timestamps
+    // (rain is hourly, level buckets vary by range), so union them and
+    // leave the unfilled side as undefined — Recharts skips missing
+    // dataKeys per-point.
+    const byT = new Map<number, Point>()
+    for (const p of points) {
+      const t = new Date(p.t).getTime()
+      byT.set(t, { t, value: p.value })
+    }
+    if (rainPoints) {
+      for (const r of rainPoints) {
+        const t = new Date(r.t).getTime()
+        const existing = byT.get(t)
+        if (existing) existing.rain = r.precipitation
+        else byT.set(t, { t, value: null, rain: r.precipitation })
+      }
+    }
+    return [...byT.values()].sort((a, b) => a.t - b.t)
+  }, [points, rainPoints])
 
   const yDomain = useMemo<[number, number]>(() => {
     const numeric = data
@@ -61,9 +81,9 @@ export function WaterLevelChart({
   return (
     <div className="w-full h-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
+        <ComposedChart
           data={data}
-          margin={{ top: 12, right: 12, left: 0, bottom: 8 }}
+          margin={{ top: 12, right: hasRain ? 40 : 12, left: 0, bottom: 8 }}
         >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -90,6 +110,7 @@ export function WaterLevelChart({
             minTickGap={40}
           />
           <YAxis
+            yAxisId="level"
             stroke="var(--muted-foreground)"
             tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
             axisLine={{ stroke: "var(--border)" }}
@@ -98,9 +119,23 @@ export function WaterLevelChart({
             domain={yDomain}
             tickFormatter={(v: number) => v.toFixed(0)}
           />
+          {hasRain && (
+            <YAxis
+              yAxisId="rain"
+              orientation="right"
+              stroke="var(--muted-foreground)"
+              tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+              axisLine={{ stroke: "var(--border)" }}
+              tickLine={{ stroke: "var(--border)" }}
+              width={36}
+              domain={[0, (dataMax: number) => Math.max(4, Math.ceil(dataMax * 1.2))]}
+              tickFormatter={(v: number) => `${v}`}
+            />
+          )}
 
           {criticalLow !== undefined && (
             <ReferenceLine
+              yAxisId="level"
               y={criticalLow}
               stroke="var(--destructive)"
               strokeDasharray="4 4"
@@ -116,6 +151,7 @@ export function WaterLevelChart({
           )}
           {optimalHigh !== undefined && (
             <ReferenceLine
+              yAxisId="level"
               y={optimalHigh}
               stroke="var(--muted-foreground)"
               strokeDasharray="4 4"
@@ -130,7 +166,22 @@ export function WaterLevelChart({
             />
           )}
 
+          {/* Rain bars sit BEHIND the level area so they read as backdrop
+              context. Muted-foreground at low opacity keeps them clearly
+              secondary to the teal level line. */}
+          {hasRain && (
+            <Bar
+              yAxisId="rain"
+              dataKey="rain"
+              fill="var(--muted-foreground)"
+              fillOpacity={0.35}
+              isAnimationActive={false}
+              maxBarSize={12}
+            />
+          )}
+
           <Area
+            yAxisId="level"
             type="monotone"
             dataKey="value"
             stroke="var(--primary)"
@@ -153,9 +204,9 @@ export function WaterLevelChart({
               strokeOpacity: 0.4,
               strokeDasharray: "3 3",
             }}
-            content={<WaterLevelTooltip />}
+            content={<WaterLevelTooltip hasRain={hasRain} />}
           />
-        </AreaChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   )
@@ -187,9 +238,10 @@ function formatFullTs(ts: number): string {
 type TooltipProps = {
   active?: boolean
   payload?: { payload: Point }[]
+  hasRain?: boolean
 }
 
-function WaterLevelTooltip({ active, payload }: TooltipProps) {
+function WaterLevelTooltip({ active, payload, hasRain }: TooltipProps) {
   if (!active || !payload || payload.length === 0) return null
   const point = payload[0].payload
   return (
@@ -206,6 +258,11 @@ function WaterLevelTooltip({ active, payload }: TooltipProps) {
         </p>
       ) : (
         <p className="mt-1 text-sm text-muted-foreground">No reading</p>
+      )}
+      {hasRain && point.rain !== undefined && (
+        <p className="mt-1 pt-1 border-t border-border/60 text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
+          Rain <span className="text-foreground">{point.rain.toFixed(1)} mm</span>
+        </p>
       )}
     </div>
   )
