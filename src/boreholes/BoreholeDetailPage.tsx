@@ -2,9 +2,7 @@ import { Link, useParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { useBorehole } from "@/boreholes/queries"
 import { SensorsPanel } from "@/sensors/SensorsPanel"
-import { PumpPanel } from "@/pump/PumpPanel"
-import { PumpHistoryPanel } from "@/pump/PumpHistoryPanel"
-import { PumpWindowsPanel } from "@/pump/PumpWindowsPanel"
+import { PumpSummaryCard } from "@/pump/PumpSummaryCard"
 import { Button } from "@/components/ui/button"
 import { PageShell } from "@/components/PageShell"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -101,9 +99,7 @@ export function BoreholeDetailPage() {
           {query.data.id !== null && query.data.id !== undefined && (
             <>
               <SensorsPanel boreholeId={query.data.id} />
-              <PumpPanel boreholeId={query.data.id} />
-              <PumpHistoryPanel boreholeId={query.data.id} />
-              <PumpWindowsPanel boreholeId={query.data.id} />
+              <PumpSummaryCard boreholeId={query.data.id} />
             </>
           )}
         </div>

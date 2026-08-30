@@ -11,6 +11,7 @@ const NAV_ITEMS = [
     // Locations conceptually, so keep the nav item lit for those routes too.
     prefixes: ["/locations", "/boreholes"],
   },
+  { to: "/pump", label: "Pump", icon: PumpIcon, prefixes: ["/pump"] },
   { to: "/data-logs", label: "Data logs", icon: DataLogsIcon, prefixes: ["/data-logs"] },
 ]
 
@@ -83,6 +84,40 @@ function DashboardIcon({ active }: { active: boolean }) {
       <rect x={2} y={11} width={5} height={3} rx={1} stroke={stroke} strokeWidth={1.3} />
       <rect x={9} y={2} width={5} height={3} rx={1} stroke={stroke} strokeWidth={1.3} />
       <rect x={9} y={7} width={5} height={7} rx={1} stroke={stroke} strokeWidth={1.3} />
+    </svg>
+  )
+}
+
+function PumpIcon({ active }: { active: boolean }) {
+  const stroke = active ? "var(--primary)" : "currentColor"
+  const fill = active ? "var(--primary)" : "transparent"
+  return (
+    <svg
+      width={16}
+      height={16}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+      className="shrink-0"
+    >
+      {/* Motor block */}
+      <rect
+        x={4.5}
+        y={1.5}
+        width={7}
+        height={5}
+        rx={1.2}
+        stroke={stroke}
+        strokeWidth={1.3}
+        fill={fill}
+        fillOpacity={0.75}
+      />
+      {/* Column down to the water */}
+      <path d="M 8 6.5 L 8 12" stroke={stroke} strokeWidth={1.3} />
+      {/* Water surface line */}
+      <path d="M 3 12 L 13 12" stroke={stroke} strokeWidth={1.3} />
+      {/* Rising droplets */}
+      <path d="M 8 14 v 1" stroke={stroke} strokeWidth={1.3} strokeLinecap="round" />
     </svg>
   )
 }
