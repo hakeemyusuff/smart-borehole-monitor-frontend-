@@ -6,12 +6,22 @@ import { useBoreholes } from "@/boreholes/queries"
 import { useSensorsForBorehole } from "@/sensors/queries"
 import { useReadingsPage } from "@/data-logs/queries"
 import { useFlowChart, useWaterLevelChart } from "@/readings/queries"
+import { usePredictionChart } from "@/predictions/queries"
 import { WaterLevelChart } from "@/readings/WaterLevelChart"
 import { FlowChart } from "@/readings/FlowChart"
+import { PredictionChart } from "@/predictions/PredictionChart"
 import { BoreholeCylinder } from "@/dashboard/BoreholeCylinder"
 import { PumpControlCard } from "@/pump/PumpControlCard"
+import { LatestPumpWindowTile } from "@/pump/LatestPumpWindowTile"
 import { WeatherStrip } from "@/weather/WeatherStrip"
-import type { Borehole, ChartPoint, Location, SensorPublic } from "@/lib/types"
+import type {
+  Borehole,
+  ChartPoint,
+  Location,
+  PredictionChartPoint,
+  SensorPublic,
+  WaterLevelReading,
+} from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -77,10 +87,13 @@ export function DashboardPage() {
     currentIndex >= 0 ? boreholesInLocation[currentIndex] : undefined
 
   return (
-    // Root screen lock. Fills the height AppLayout hands us; scrolls on
-    // narrow viewports where the strict grid would crush content, locks
-    // entirely at lg+ per the layout spec.
-    <div className="h-full w-full flex flex-col p-4 md:p-6 overflow-y-auto lg:overflow-hidden min-w-0">
+    // Dashboard scrolls at all sizes now — the new prediction chart +
+    // pump window tile don't fit a locked viewport, and stacking charts
+    // in a fixed grid would just crush them. Chart cards still get
+    // explicit heights (h-80 md:h-96) and every wrapper keeps min-h-0
+    // /min-w-0 so Recharts' ResponsiveContainer can't ratchet the layout
+    // wider on each resize (the old lockdown fix, retained).
+    <div className="h-full w-full flex flex-col p-4 md:p-6 overflow-y-auto min-w-0">
       <DashboardHeader
         locations={locationsQuery.data ?? []}
         locationsPending={locationsQuery.isPending}
@@ -224,42 +237,157 @@ function BoreholeGrid({ borehole }: { borehole: Borehole }) {
   const flowSensor = sensors.find((s) => s.type === "flow_meter")
 
   return (
-    // Widget grid workspace. min-h-0/min-w-0 are load-bearing: they stop
-    // Recharts' ResponsiveContainer from ratcheting the grid width larger
-    // on every resize (the classic Chrome overflow trap).
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:flex-1 lg:min-h-0 lg:min-w-0 animate-in fade-in duration-300">
-      <div className="flex flex-col gap-4 min-w-0 lg:col-span-4 lg:h-full lg:min-h-0">
-        <CylinderCard
-          borehole={borehole}
+    <div className="flex flex-col gap-4 md:gap-6 animate-in fade-in duration-300 min-w-0">
+      {/* KPI strip — quick-glance summaries at the top of the scroll. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 min-w-0">
+        <LatestLevelKpi
           boreholeId={boreholeId}
           pressureSensor={pressureSensor}
           sensorsPending={sensorsQuery.isPending}
+          criticalLow={borehole.critical_low_level}
+          optimalHigh={borehole.optimal_high_level}
         />
-        <WeatherStrip locationId={borehole.location_id ?? undefined} />
         {boreholeId !== undefined && (
           <PumpControlCard boreholeId={boreholeId} />
         )}
+        {boreholeId !== undefined && (
+          <LatestPumpWindowTile boreholeId={boreholeId} />
+        )}
+        <WeatherStrip locationId={borehole.location_id ?? undefined} />
       </div>
 
-      <div className="flex flex-col gap-4 min-w-0 lg:col-span-8 lg:grid lg:grid-rows-2 lg:h-full lg:min-h-0 lg:min-w-0">
-        <ChartCard title="Water level (24h)">
-          <WaterLevelOverviewBody
+      {/* Main grid: cylinder (hero visual) on the left, charts stacked
+          on the right. Chart wrappers keep min-h-0/min-w-0 so
+          ResponsiveContainer never ratchets. */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 min-w-0">
+        <div className="flex flex-col gap-4 min-w-0 lg:col-span-4">
+          <CylinderCard
+            borehole={borehole}
             boreholeId={boreholeId}
-            sensor={pressureSensor}
-            sensorsPending={sensorsQuery.isPending}
-            criticalLow={borehole.critical_low_level}
-            optimalHigh={borehole.optimal_high_level}
-          />
-        </ChartCard>
-        <ChartCard title="Flow (24h)">
-          <FlowOverviewBody
-            boreholeId={boreholeId}
-            sensor={flowSensor}
+            pressureSensor={pressureSensor}
             sensorsPending={sensorsQuery.isPending}
           />
-        </ChartCard>
+        </div>
+
+        <div className="flex flex-col gap-4 md:gap-6 min-w-0 lg:col-span-8">
+          <ChartCard title="Water level (24h)">
+            <WaterLevelOverviewBody
+              boreholeId={boreholeId}
+              sensor={pressureSensor}
+              sensorsPending={sensorsQuery.isPending}
+              criticalLow={borehole.critical_low_level}
+              optimalHigh={borehole.optimal_high_level}
+            />
+          </ChartCard>
+          <ChartCard
+            title="Predicted vs actual (24h)"
+            subtitle="Model forecast overlaid on real readings. Dashed = predicted, solid = actual."
+          >
+            <PredictionsOverviewBody
+              boreholeId={boreholeId}
+              criticalLow={borehole.critical_low_level}
+              optimalHigh={borehole.optimal_high_level}
+            />
+          </ChartCard>
+          <ChartCard title="Flow (24h)">
+            <FlowOverviewBody
+              boreholeId={boreholeId}
+              sensor={flowSensor}
+              sensorsPending={sensorsQuery.isPending}
+            />
+          </ChartCard>
+        </div>
       </div>
     </div>
+  )
+}
+
+function LatestLevelKpi({
+  boreholeId,
+  pressureSensor,
+  sensorsPending,
+  criticalLow,
+  optimalHigh,
+}: {
+  boreholeId: number | undefined
+  pressureSensor: SensorPublic | undefined
+  sensorsPending: boolean
+  criticalLow: number
+  optimalHigh: number
+}) {
+  const latestQuery = useReadingsPage(
+    "water-level",
+    boreholeId,
+    pressureSensor?.id,
+    0,
+    1,
+  )
+  const latest: WaterLevelReading | undefined = latestQuery.data?.items[0]
+  const level = latest?.water_level ?? null
+
+  const stateLabel = level === null
+    ? null
+    : level < criticalLow
+      ? { text: "Critical", className: "bg-destructive/15 text-destructive" }
+      : level >= optimalHigh
+        ? { text: "Optimal", className: "bg-primary/15 text-primary" }
+        : { text: "Below optimal", className: "bg-secondary text-muted-foreground" }
+
+  if (sensorsPending || (pressureSensor && latestQuery.isPending)) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="font-heading text-xl">Water level</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-3 w-32" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!pressureSensor) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="font-heading text-xl">Water level</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            No pressure transducer installed.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="w-full">
+      <CardHeader>
+        <div className="w-full flex items-start justify-between gap-3">
+          <CardTitle className="font-heading text-xl">Water level</CardTitle>
+          {stateLabel && (
+            <span
+              className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${stateLabel.className}`}
+            >
+              {stateLabel.text}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-1">
+        <p className="flex items-baseline gap-1.5">
+          <span className="text-3xl [font-variant-numeric:tabular-nums] text-foreground">
+            {level !== null ? level.toFixed(2) : "—"}
+          </span>
+          <span className="text-xs text-muted-foreground">m</span>
+        </p>
+        <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground [font-variant-numeric:tabular-nums]">
+          {latest ? `As of ${formatShortTs(latest.captured_at)}` : "—"}
+        </p>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -288,37 +416,22 @@ function CylinderCard({
   const isPending = sensorsPending || (hasSensor && latestQuery.isPending)
 
   return (
-    <Card className="w-full flex flex-col overflow-hidden lg:flex-1 lg:min-h-0 lg:min-w-0">
+    <Card className="w-full flex flex-col overflow-hidden">
       <CardHeader className="shrink-0">
-        <div className="w-full flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0 flex flex-col gap-1">
-            <CardTitle className="font-heading text-xl">Water level</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Latest reading from the pressure transducer.
-            </p>
-          </div>
-          {currentLevel !== null && (
-            <div className="flex flex-col items-end gap-0.5 shrink-0">
-              <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                Latest
-              </span>
-              <span className="text-2xl [font-variant-numeric:tabular-nums] text-foreground">
-                {currentLevel.toFixed(2)}
-                <span className="text-muted-foreground text-base ml-1">m</span>
-              </span>
-            </div>
-          )}
-        </div>
+        <CardTitle className="font-heading text-xl">Water level</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Where the water sits inside the borehole right now.
+        </p>
       </CardHeader>
-      <CardContent className="flex flex-col lg:flex-1 lg:min-h-0 lg:min-w-0">
+      <CardContent className="flex flex-col">
         {!hasSensor && !sensorsPending ? (
-          <div className="h-72 md:h-80 lg:h-auto lg:flex-1 lg:min-h-0 flex items-center justify-center text-center">
+          <div className="h-72 md:h-96 flex items-center justify-center text-center">
             <p className="text-sm text-muted-foreground">
               No pressure transducer installed on this borehole yet.
             </p>
           </div>
         ) : (
-          <div className="h-72 md:h-80 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0 flex items-center justify-center">
+          <div className="h-72 md:h-96 flex items-center justify-center min-h-0 min-w-0">
             <BoreholeCylinder
               totalDepth={borehole.total_depth}
               criticalLow={borehole.critical_low_level}
@@ -338,19 +451,33 @@ function CylinderCard({
   )
 }
 
+/**
+ * Fixed-height chart card. Load-bearing invariants:
+ *   - `h-80 md:h-96` gives ResponsiveContainer a definite parent height.
+ *   - `overflow-hidden` clips any layout thrash during resize.
+ *   - `min-h-0 min-w-0` on the card AND on the CardContent stops the
+ *     ratcheting bug where Recharts' ResponsiveContainer measures its
+ *     own dimensions and the grid grows on every layout pass.
+ * Do NOT remove min-h-0 / min-w-0 even though the dashboard now scrolls.
+ */
 function ChartCard({
   title,
+  subtitle,
   children,
 }: {
   title: string
+  subtitle?: string
   children: React.ReactNode
 }) {
   return (
-    <Card className="w-full flex flex-col overflow-hidden lg:h-full lg:min-h-0 lg:min-w-0">
+    <Card className="w-full flex flex-col overflow-hidden h-80 md:h-96 min-h-0 min-w-0">
       <CardHeader className="shrink-0">
         <CardTitle className="font-heading text-xl">{title}</CardTitle>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        )}
       </CardHeader>
-      <CardContent className="flex flex-col lg:flex-1 lg:min-h-0 lg:min-w-0">
+      <CardContent className="flex-1 flex flex-col min-h-0 min-w-0">
         {children}
       </CardContent>
     </Card>
@@ -428,6 +555,82 @@ function FlowOverviewBody({
   )
 }
 
+function PredictionsOverviewBody({
+  boreholeId,
+  criticalLow,
+  optimalHigh,
+}: {
+  boreholeId: number | undefined
+  criticalLow: number
+  optimalHigh: number
+}) {
+  const chartQuery = usePredictionChart(boreholeId, "day")
+  return (
+    <PredictionOverviewChartArea
+      pending={chartQuery.isPending}
+      error={chartQuery.isError}
+      errorMessage={
+        chartQuery.error instanceof ApiError
+          ? chartQuery.error.message
+          : "Couldn't load predictions."
+      }
+      onRetry={() => chartQuery.refetch()}
+      data={chartQuery.data}
+      render={(points) => (
+        <PredictionChart
+          points={points}
+          range="day"
+          criticalLow={criticalLow}
+          optimalHigh={optimalHigh}
+        />
+      )}
+    />
+  )
+}
+
+function PredictionOverviewChartArea({
+  pending,
+  error,
+  errorMessage,
+  onRetry,
+  data,
+  render,
+}: {
+  pending: boolean
+  error: boolean
+  errorMessage: string
+  onRetry: () => void
+  data: PredictionChartPoint[] | undefined
+  render: (points: PredictionChartPoint[]) => React.ReactNode
+}) {
+  if (pending) {
+    return <Skeleton className="flex-1 min-h-0 min-w-0 w-full" />
+  }
+  if (error) {
+    return (
+      <div className="flex flex-col gap-3 items-start">
+        <p className="text-destructive text-sm">{errorMessage}</p>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Try again
+        </Button>
+      </div>
+    )
+  }
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center text-center">
+        <p className="text-muted-foreground text-sm max-w-xs">
+          No predictions yet — the model needs enough historical readings
+          to backfill this borehole.
+        </p>
+      </div>
+    )
+  }
+  return (
+    <div className="flex-1 w-full min-h-0 min-w-0">{render(data)}</div>
+  )
+}
+
 function OverviewChartArea({
   hasSensor,
   sensorsPending,
@@ -452,11 +655,11 @@ function OverviewChartArea({
   render: (points: ChartPoint[]) => React.ReactNode
 }) {
   if (sensorsPending || (hasSensor && chartPending)) {
-    return <Skeleton className="h-64 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0 w-full" />
+    return <Skeleton className="flex-1 min-h-0 min-w-0 w-full" />
   }
   if (!hasSensor) {
     return (
-      <div className="h-64 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0 flex items-center justify-center text-center">
+      <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center text-center">
         <p className="text-muted-foreground text-sm max-w-xs">
           {missingSensorText}
         </p>
@@ -475,13 +678,13 @@ function OverviewChartArea({
   }
   if (!data || data.length === 0) {
     return (
-      <div className="h-64 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0 flex items-center justify-center text-center">
+      <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center text-center">
         <p className="text-muted-foreground text-sm max-w-xs">{emptyText}</p>
       </div>
     )
   }
   return (
-    <div className="w-full h-64 lg:h-auto lg:flex-1 lg:min-h-0 lg:min-w-0">
+    <div className="flex-1 w-full min-h-0 min-w-0">
       {render(data)}
     </div>
   )
@@ -507,7 +710,7 @@ function LocationGate({
   children: React.ReactNode
 }) {
   if (locationsPending) {
-    return <Skeleton className="lg:flex-1 lg:min-h-0 h-96 w-full" />
+    return <Skeleton className="h-96 w-full" />
   }
   if (!hasLocation) {
     return (
@@ -526,7 +729,7 @@ function LocationGate({
     )
   }
   if (boreholesPending) {
-    return <Skeleton className="lg:flex-1 lg:min-h-0 h-96 w-full" />
+    return <Skeleton className="h-96 w-full" />
   }
   if (boreholesInLocation.length === 0) {
     return (
@@ -538,7 +741,7 @@ function LocationGate({
 
 function EmptyBlock({ text }: { text: string }) {
   return (
-    <div className="rounded-xl border border-border/70 bg-card/40 p-10 text-center lg:flex-1 lg:min-h-0 flex items-center justify-center">
+    <div className="rounded-xl border border-border/70 bg-card/40 p-10 text-center flex items-center justify-center">
       <p className="text-muted-foreground text-sm max-w-prose mx-auto">{text}</p>
     </div>
   )
