@@ -14,6 +14,7 @@ import { BoreholeCylinder } from "@/dashboard/BoreholeCylinder"
 import { usePump, useChangePumpStatus } from "@/pump/queries"
 import { usePumpWindows } from "@/pump/queries"
 import { useWeatherSeries } from "@/weather/queries"
+import { HumidityIcon, RainIcon, TempIcon } from "@/weather/icons"
 import { cn } from "@/lib/utils"
 import type {
   Borehole,
@@ -692,9 +693,24 @@ function WeatherCell({
           (was flex-wrap with a 13px readout, which pushed the third stat
           to a second row and looked cramped on mobile). */}
       <div className="grid grid-cols-3 gap-2">
-        <WeatherStat label="Temp" value={fmt(latest.temperature, 1)} unit="°C" />
-        <WeatherStat label="Humid" value={fmt(latest.humidity, 0)} unit="%" />
-        <WeatherStat label="Rain" value={fmt(latest.precipitation, 1)} unit="mm" />
+        <WeatherStat
+          icon={<TempIcon size={12} />}
+          label="Temp"
+          value={fmt(latest.temperature, 1)}
+          unit="°C"
+        />
+        <WeatherStat
+          icon={<HumidityIcon size={12} />}
+          label="Humid"
+          value={fmt(latest.humidity, 0)}
+          unit="%"
+        />
+        <WeatherStat
+          icon={<RainIcon size={12} />}
+          label="Rain"
+          value={fmt(latest.precipitation, 1)}
+          unit="mm"
+        />
       </div>
       <span className="text-[10px] text-muted-foreground/60 [font-variant-numeric:tabular-nums]">
         {formatWhen(latest.created_at)}
@@ -704,17 +720,22 @@ function WeatherCell({
 }
 
 function WeatherStat({
+  icon,
   label,
   value,
   unit,
 }: {
+  icon: React.ReactNode
   label: string
   value: string
   unit: string
 }) {
   return (
     <div className="flex flex-col leading-tight min-w-0">
-      <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+        <span className="text-muted-foreground/70 shrink-0" aria-hidden>
+          {icon}
+        </span>
         {label}
       </span>
       <span className="text-base font-medium [font-variant-numeric:tabular-nums] truncate">
@@ -822,7 +843,11 @@ function ChartCard({
   return (
     <Card className={cn(
       "w-full flex flex-col overflow-hidden min-h-0 min-w-0",
-      stretch ? "h-full" : "h-72 md:h-80",
+      // `stretch` fills the row height at lg+ (where it lives inside a
+      // grid cell with `lg:h-full`). Below that breakpoint there's no
+      // definite parent height, so `h-full` collapses to 0 and the plot
+      // area disappears — fall back to the standard fixed height.
+      stretch ? "h-72 md:h-80 lg:h-full" : "h-72 md:h-80",
     )}>
       <CardHeader className="shrink-0">
         <div className="w-full flex items-start justify-between gap-3">
@@ -986,12 +1011,15 @@ function PredictionOverviewChartArea({
       </div>
     )
   }
-  if (!data || data.length === 0) {
+  // A line/area needs ≥2 points to draw anything meaningful. With one
+  // point Recharts renders a lonely dot in a giant grid, which reads
+  // as broken. Treat that as "not enough data yet".
+  if (!data || data.length < 2) {
     return (
       <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center text-center">
         <p className="text-muted-foreground text-sm max-w-xs">
-          No predictions yet — the model needs enough historical readings
-          to backfill this borehole.
+          Not enough predictions yet — the model needs more historical
+          readings before the forecast line has shape.
         </p>
       </div>
     )
