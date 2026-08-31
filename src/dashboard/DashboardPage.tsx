@@ -688,9 +688,12 @@ function WeatherCell({
 
   return (
     <StatusCell label="Weather">
-      <div className="flex items-center gap-4 flex-wrap">
+      {/* Grid keeps the three stats aligned + legible on narrow widths
+          (was flex-wrap with a 13px readout, which pushed the third stat
+          to a second row and looked cramped on mobile). */}
+      <div className="grid grid-cols-3 gap-2">
         <WeatherStat label="Temp" value={fmt(latest.temperature, 1)} unit="°C" />
-        <WeatherStat label="Humidity" value={fmt(latest.humidity, 0)} unit="%" />
+        <WeatherStat label="Humid" value={fmt(latest.humidity, 0)} unit="%" />
         <WeatherStat label="Rain" value={fmt(latest.precipitation, 1)} unit="mm" />
       </div>
       <span className="text-[10px] text-muted-foreground/60 [font-variant-numeric:tabular-nums]">
@@ -710,13 +713,13 @@ function WeatherStat({
   unit: string
 }) {
   return (
-    <div className="flex flex-col leading-tight">
-      <span className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground/70">
+    <div className="flex flex-col leading-tight min-w-0">
+      <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
         {label}
       </span>
-      <span className="text-[13px] [font-variant-numeric:tabular-nums]">
+      <span className="text-base font-medium [font-variant-numeric:tabular-nums] truncate">
         {value}
-        <span className="text-muted-foreground ml-0.5">{unit}</span>
+        <span className="text-muted-foreground text-[11px] ml-0.5">{unit}</span>
       </span>
     </div>
   )

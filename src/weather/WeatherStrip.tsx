@@ -71,7 +71,10 @@ function WeatherBody({
     )
   }
   return (
-    <div className="flex items-center gap-4 md:gap-6 flex-wrap">
+    // 3-col grid so the stats stay aligned + readable on narrow widths;
+    // was flex-wrap with a sub-14px readout that broke to two rows and
+    // looked cramped on mobile.
+    <div className="grid grid-cols-3 gap-3 md:gap-6">
       <Stat
         icon={<TempIcon />}
         label="Temp"
@@ -107,16 +110,16 @@ function Stat({
 }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <span className="text-muted-foreground/80" aria-hidden>
+      <span className="text-muted-foreground/80 shrink-0" aria-hidden>
         {icon}
       </span>
       <div className="flex flex-col leading-tight min-w-0">
-        <span className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+        <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           {label}
         </span>
-        <span className="text-sm text-foreground [font-variant-numeric:tabular-nums]">
+        <span className="text-base font-medium text-foreground [font-variant-numeric:tabular-nums] truncate">
           {value}
-          <span className="text-muted-foreground ml-0.5">{unit}</span>
+          <span className="text-muted-foreground text-xs ml-0.5">{unit}</span>
         </span>
       </div>
     </div>
