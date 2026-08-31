@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts"
 import type { ChartRange, PredictionChartPoint } from "@/lib/types"
+import { useIsNarrow } from "@/lib/useIsNarrow"
 
 type Point = {
   t: number
@@ -49,6 +50,7 @@ export function PredictionChart({
   optimalHigh?: number
 }) {
   const predGradId = useId()
+  const narrow = useIsNarrow()
 
   const data = useMemo<Point[]>(
     () =>
@@ -89,7 +91,7 @@ export function PredictionChart({
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}
-          margin={{ top: 12, right: 12, left: 0, bottom: 8 }}
+          margin={{ top: 12, right: narrow ? 4 : 12, left: 0, bottom: 8 }}
         >
           <defs>
             <linearGradient id={predGradId} x1="0" y1="0" x2="0" y2="1">
@@ -108,21 +110,22 @@ export function PredictionChart({
             dataKey="t"
             type="number"
             domain={["dataMin", "dataMax"]}
-            tickFormatter={(ts: number) => formatTick(ts, range)}
+            tickFormatter={(ts: number) => formatTick(ts, range, narrow)}
             stroke="var(--muted-foreground)"
-            tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+            tick={{ fill: "var(--muted-foreground)", fontSize: narrow ? 10 : 11 }}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={{ stroke: "var(--border)" }}
-            minTickGap={40}
+            minTickGap={narrow ? 32 : 40}
           />
           <YAxis
             stroke="var(--muted-foreground)"
-            tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+            tick={{ fill: "var(--muted-foreground)", fontSize: narrow ? 10 : 11 }}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={{ stroke: "var(--border)" }}
-            width={44}
+            width={narrow ? 32 : 44}
             domain={yDomain}
             tickFormatter={(v: number) => v.toFixed(0)}
+            tickCount={narrow ? 4 : 5}
           />
 
           {criticalLow !== undefined && (
@@ -131,13 +134,17 @@ export function PredictionChart({
               stroke="var(--destructive)"
               strokeDasharray="4 4"
               strokeOpacity={0.7}
-              label={{
-                value: `Critical ${criticalLow}m`,
-                position: "insideBottomLeft",
-                fill: "var(--destructive)",
-                fontSize: 10,
-                dy: -4,
-              }}
+              label={
+                narrow
+                  ? undefined
+                  : {
+                      value: `Critical ${criticalLow}m`,
+                      position: "insideBottomLeft",
+                      fill: "var(--destructive)",
+                      fontSize: 10,
+                      dy: -4,
+                    }
+              }
             />
           )}
           {optimalHigh !== undefined && (
@@ -146,13 +153,17 @@ export function PredictionChart({
               stroke="var(--muted-foreground)"
               strokeDasharray="4 4"
               strokeOpacity={0.6}
-              label={{
-                value: `Optimal ${optimalHigh}m`,
-                position: "insideTopLeft",
-                fill: "var(--muted-foreground)",
-                fontSize: 10,
-                dy: 12,
-              }}
+              label={
+                narrow
+                  ? undefined
+                  : {
+                      value: `Optimal ${optimalHigh}m`,
+                      position: "insideTopLeft",
+                      fill: "var(--muted-foreground)",
+                      fontSize: 10,
+                      dy: 12,
+                    }
+              }
             />
           )}
 
@@ -205,13 +216,12 @@ export function PredictionChart({
   )
 }
 
-function formatTick(ts: number, range: ChartRange): string {
+function formatTick(ts: number, range: ChartRange, narrow = false): string {
   const d = new Date(ts)
   if (range === "day") {
-    return d.toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+    return narrow
+      ? d.toLocaleTimeString(undefined, { hour: "2-digit" })
+      : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
   }
   return d.toLocaleDateString(undefined, {
     month: "short",

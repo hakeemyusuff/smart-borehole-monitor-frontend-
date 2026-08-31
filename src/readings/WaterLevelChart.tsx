@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts"
 import type { ChartPoint, ChartRange, RainChartPoint } from "@/lib/types"
+import { useIsNarrow } from "@/lib/useIsNarrow"
 
 type Point = {
   t: number
@@ -35,6 +36,7 @@ export function WaterLevelChart({
   rainPoints?: RainChartPoint[]
 }) {
   const gradientId = useId()
+  const narrow = useIsNarrow()
 
   const hasRain = !!rainPoints && rainPoints.length > 0
 
@@ -78,12 +80,22 @@ export function WaterLevelChart({
 
   if (data.length === 0) return null
 
+  // Mobile-tightened geometry: shave the y-axis gutter so the plot area
+  // isn't crushed on 375px, and skip the destructive/optimal reference
+  // labels (they collide with tick labels — the dashed line + colour is
+  // enough context; the tooltip carries the exact value).
+  const levelAxisWidth = narrow ? 32 : 44
+  const rainAxisWidth = narrow ? 28 : 36
+  const rightMargin = hasRain ? (narrow ? 4 : 40) : narrow ? 4 : 12
+  const showRefLabels = !narrow
+  const tickFontSize = narrow ? 10 : 11
+
   return (
     <div className="w-full h-full">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={data}
-          margin={{ top: 12, right: hasRain ? 40 : 12, left: 0, bottom: 8 }}
+          margin={{ top: 12, right: rightMargin, left: 0, bottom: 8 }}
         >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -102,34 +114,36 @@ export function WaterLevelChart({
             dataKey="t"
             type="number"
             domain={["dataMin", "dataMax"]}
-            tickFormatter={(ts: number) => formatTick(ts, range)}
+            tickFormatter={(ts: number) => formatTick(ts, range, narrow)}
             stroke="var(--muted-foreground)"
-            tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+            tick={{ fill: "var(--muted-foreground)", fontSize: tickFontSize }}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={{ stroke: "var(--border)" }}
-            minTickGap={40}
+            minTickGap={narrow ? 32 : 40}
           />
           <YAxis
             yAxisId="level"
             stroke="var(--muted-foreground)"
-            tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+            tick={{ fill: "var(--muted-foreground)", fontSize: tickFontSize }}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={{ stroke: "var(--border)" }}
-            width={44}
+            width={levelAxisWidth}
             domain={yDomain}
             tickFormatter={(v: number) => v.toFixed(0)}
+            tickCount={narrow ? 4 : 5}
           />
           {hasRain && (
             <YAxis
               yAxisId="rain"
               orientation="right"
               stroke="var(--muted-foreground)"
-              tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+              tick={{ fill: "var(--muted-foreground)", fontSize: narrow ? 9 : 10 }}
               axisLine={{ stroke: "var(--border)" }}
               tickLine={{ stroke: "var(--border)" }}
-              width={36}
+              width={rainAxisWidth}
               domain={[0, (dataMax: number) => Math.max(4, Math.ceil(dataMax * 1.2))]}
               tickFormatter={(v: number) => `${v}`}
+              tickCount={narrow ? 3 : 5}
             />
           )}
 
@@ -140,13 +154,17 @@ export function WaterLevelChart({
               stroke="var(--destructive)"
               strokeDasharray="4 4"
               strokeOpacity={0.7}
-              label={{
-                value: `Critical ${criticalLow}m`,
-                position: "insideBottomLeft",
-                fill: "var(--destructive)",
-                fontSize: 10,
-                dy: -4,
-              }}
+              label={
+                showRefLabels
+                  ? {
+                      value: `Critical ${criticalLow}m`,
+                      position: "insideBottomLeft",
+                      fill: "var(--destructive)",
+                      fontSize: 10,
+                      dy: -4,
+                    }
+                  : undefined
+              }
             />
           )}
           {optimalHigh !== undefined && (
@@ -156,13 +174,17 @@ export function WaterLevelChart({
               stroke="var(--muted-foreground)"
               strokeDasharray="4 4"
               strokeOpacity={0.6}
-              label={{
-                value: `Optimal ${optimalHigh}m`,
-                position: "insideTopLeft",
-                fill: "var(--muted-foreground)",
-                fontSize: 10,
-                dy: 12,
-              }}
+              label={
+                showRefLabels
+                  ? {
+                      value: `Optimal ${optimalHigh}m`,
+                      position: "insideTopLeft",
+                      fill: "var(--muted-foreground)",
+                      fontSize: 10,
+                      dy: 12,
+                    }
+                  : undefined
+              }
             />
           )}
 
@@ -212,13 +234,14 @@ export function WaterLevelChart({
   )
 }
 
-function formatTick(ts: number, range: ChartRange): string {
+function formatTick(ts: number, range: ChartRange, narrow = false): string {
   const d = new Date(ts)
   if (range === "day") {
-    return d.toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+    // Drop minutes on narrow screens ("14" vs "14:00") — 2-digit hour is
+    // still unambiguous inside a 24h chart window.
+    return narrow
+      ? d.toLocaleTimeString(undefined, { hour: "2-digit" })
+      : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
   }
   return d.toLocaleDateString(undefined, {
     month: "short",

@@ -194,11 +194,15 @@ function WaterLevelPanel({
           </div>
           {latest !== null && <LatestReadout value={latest} unit="m" />}
         </div>
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <RangeSelector value={range} onChange={setRange} />
           {showRain && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span className="w-3 h-2.5 rounded-sm" style={{ background: "#5B9BD5", opacity: 0.35 }} />
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground shrink-0">
+              <span
+                className="w-3 h-2.5 rounded-sm"
+                style={{ background: "#5B9BD5", opacity: 0.35 }}
+                aria-hidden
+              />
               Rainfall (mm)
             </span>
           )}
