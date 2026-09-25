@@ -170,16 +170,26 @@ export type ChartPoint = {
   value: number | null
 }
 
-// Predicted-vs-actual water level from the ML model. `actual` is null for
-// still-future points or when the paired reading is missing; `predicted`
-// and `confidence` are always present. `confidence` is a 0..1 inter-tree
-// agreement heuristic — render as a percentage in tooltips only; do NOT
-// treat it as a ±metre band, it isn't calibrated.
+// Gaps are explicit; regression does not supply a calibrated confidence score.
 export type PredictionChartPoint = {
   t: string
-  predicted: number
+  predicted: number | null
   actual: number | null
-  confidence: number
+  confidence: number | null
+  issued_at: string | null
+  model_version: string | null
+}
+
+export type PredictionStatus = {
+  status: "fresh" | "stale" | "unavailable"
+  message: string
+  checked_at: string
+  predicted_level_2h: number | null
+  issued_at: string | null
+  predicted_for: string | null
+  model_version: string | null
+  current_level: number | null
+  current_level_captured_at: string | null
 }
 
 // One pump event: start → end, with the totalled abstraction volume,

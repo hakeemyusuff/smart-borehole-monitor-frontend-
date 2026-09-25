@@ -6,11 +6,11 @@ import { useBoreholes } from "@/boreholes/queries"
 import { useSensorsForBorehole } from "@/sensors/queries"
 import { useReadingsPage } from "@/data-logs/queries"
 import { useFlowChart, useWaterLevelChart } from "@/readings/queries"
-import { usePredictionChart } from "@/predictions/queries"
 import { WaterLevelChart } from "@/readings/WaterLevelChart"
 import { FlowChart } from "@/readings/FlowChart"
-import { PredictionChart } from "@/predictions/PredictionChart"
-import { BoreholeCylinder } from "@/dashboard/BoreholeCylinder"
+import { ForecastPanel } from "@/predictions/ForecastPanel"
+import { RangeSelector } from "@/components/RangeSelector"
+import { rangeDescription, buildDailyVolumes } from "@/readings/chart-data"
 import { usePump, useChangePumpStatus } from "@/pump/queries"
 import { usePumpWindows } from "@/pump/queries"
 import { useWeatherSeries } from "@/weather/queries"
@@ -20,7 +20,7 @@ import type {
   Borehole,
   ChartPoint,
   Location,
-  PredictionChartPoint,
+  ChartRange,
   PumpStatus,
   SensorPublic,
   WaterLevelReading,
@@ -100,7 +100,8 @@ export function DashboardPage() {
     currentIndex >= 0 ? boreholesInLocation[currentIndex] : undefined
 
   return (
-    <div className="h-full w-full flex flex-col p-4 md:p-6 overflow-y-auto min-w-0">
+    <div className="h-full w-full flex flex-col overflow-y-auto min-w-0">
+      <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 flex flex-col min-w-0">
       <DashboardHeader
         locations={locationsQuery.data ?? []}
         locationsPending={locationsQuery.isPending}
@@ -109,6 +110,13 @@ export function DashboardPage() {
           setParams((p) => {
             p.set("location", String(id))
             p.delete("borehole")
+            return p
+          })
+        }
+        boreholes={boreholesInLocation}
+        onBoreholeSelect={(id) =>
+          setParams((p) => {
+            p.set("borehole", String(id))
             return p
           })
         }
@@ -143,6 +151,7 @@ export function DashboardPage() {
       >
         {currentBorehole && <BoreholeGrid borehole={currentBorehole} />}
       </LocationGate>
+      </div>
     </div>
   )
 }
@@ -152,18 +161,22 @@ function DashboardHeader({
   locationsPending,
   locationId,
   onLocationChange,
+  boreholes,
   currentBorehole,
   boreholeIndex,
   boreholeTotal,
+  onBoreholeSelect,
   onBoreholeStep,
 }: {
   locations: Location[]
   locationsPending: boolean
   locationId: number | undefined
   onLocationChange: (id: number) => void
+  boreholes: Borehole[]
   currentBorehole: Borehole | undefined
   boreholeIndex: number
   boreholeTotal: number
+  onBoreholeSelect: (id: number) => void
   onBoreholeStep: (delta: -1 | 1) => void
 }) {
   const canPrev = boreholeIndex > 0
@@ -211,14 +224,30 @@ function DashboardHeader({
             >
               <span aria-hidden>←</span>
             </Button>
-            <div className="flex flex-col min-w-0">
-              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                Borehole {boreholeIndex + 1} of {boreholeTotal}
+            <label className="flex flex-col gap-1.5 min-w-0">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground whitespace-nowrap">
+                Borehole · {boreholeIndex + 1} of {boreholeTotal}
               </span>
-              <span className="text-lg font-heading truncate">
-                {currentBorehole.name}
-              </span>
-            </div>
+              <Select
+                value={
+                  currentBorehole.id !== undefined && currentBorehole.id !== null
+                    ? String(currentBorehole.id)
+                    : undefined
+                }
+                onValueChange={(v) => onBoreholeSelect(Number(v))}
+              >
+                <SelectTrigger className="w-full sm:w-56" aria-label="Select borehole">
+                  <span className="font-heading truncate">{currentBorehole.name}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  {boreholes.map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
             <Button
               size="icon"
               variant="outline"
@@ -238,111 +267,28 @@ function DashboardHeader({
 function BoreholeGrid({ borehole }: { borehole: Borehole }) {
   const boreholeId = borehole.id ?? undefined
   const sensorsQuery = useSensorsForBorehole(boreholeId)
-  const sensors: SensorPublic[] = sensorsQuery.data ?? []
-
-  const pressureSensor = sensors.find((s) => s.type === "pressure_transducer")
-  const flowSensor = sensors.find((s) => s.type === "flow_meter")
-
+  const sensors = sensorsQuery.data ?? []
+  const pressureSensor = sensors.find(s => s.type === "pressure_transducer")
+  const flowSensor = sensors.find(s => s.type === "flow_meter")
+  const [range, setRange] = useState<ChartRange>("day")
   return (
-    <div className="flex flex-col gap-5 md:gap-6 animate-in fade-in duration-300 min-w-0">
-      {/* ── Status strip ── */}
-      <StatusStrip
-        boreholeId={boreholeId}
-        pressureSensor={pressureSensor}
-        sensorsPending={sensorsQuery.isPending}
-        criticalLow={borehole.critical_low_level}
-        optimalHigh={borehole.optimal_high_level}
-        locationId={borehole.location_id ?? undefined}
-      />
-
-      {/* ── Section: Live status ── */}
-      <div className="flex flex-col gap-4">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50 pl-0.5">
-          Live status
-        </p>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 min-w-0 items-stretch">
-          <div className="flex flex-col min-w-0 lg:col-span-4 lg:h-full">
-            <CylinderCard
-              borehole={borehole}
-              boreholeId={boreholeId}
-              pressureSensor={pressureSensor}
-              sensorsPending={sensorsQuery.isPending}
-            />
-          </div>
-          <div className="flex flex-col min-w-0 lg:col-span-8 lg:h-full">
-            <ChartCard
-              title="Water level (24h)"
-              subtitle="Recent readings from the pressure transducer"
-              stretch
-              viewHref={
-                pressureSensor && boreholeId !== undefined
-                  ? `/boreholes/${boreholeId}/sensors/${pressureSensor.id}`
-                  : undefined
-              }
-            >
-              <WaterLevelOverviewBody
-                boreholeId={boreholeId}
-                sensor={pressureSensor}
-                sensorsPending={sensorsQuery.isPending}
-                criticalLow={borehole.critical_low_level}
-                optimalHigh={borehole.optimal_high_level}
-              />
-            </ChartCard>
-          </div>
+    <div className="flex flex-col gap-4 min-w-0">
+      <StatusStrip boreholeId={boreholeId} pressureSensor={pressureSensor} sensorsPending={sensorsQuery.isPending} criticalLow={borehole.critical_low_level} optimalHigh={borehole.optimal_high_level} locationId={borehole.location_id ?? undefined}/>
+      {sensorsQuery.isError && <p role="alert" className="text-sm text-destructive">Unable to load sensors. <button className="underline" onClick={() => sensorsQuery.refetch()}>Retry</button></p>}
+      <ForecastPanel borehole={borehole} sensor={pressureSensor}/>
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <div>
+          <h2 className="font-heading text-xl">Measurement history</h2>
+          <p className="text-xs text-muted-foreground mt-1">{rangeDescription[range]}</p>
         </div>
+        <RangeSelector value={range} onChange={setRange}/>
       </div>
-
-      {/* ── Section: Analysis ── */}
-      <div
-        className="flex flex-col gap-4 -mx-4 md:-mx-6 px-4 md:px-6 py-5 -my-1"
-        style={{
-          background: "rgba(18, 39, 48, 0.4)",
-          borderTop: "1px solid rgba(30, 55, 66, 0.5)",
-          borderBottom: "1px solid rgba(30, 55, 66, 0.5)",
-        }}
-      >
-        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50 pl-0.5">
-          Analysis
-        </p>
-
-        <ChartCard
-          title="Predicted vs actual (24h)"
-          subtitle="Model forecast overlaid on real readings"
-          legend={
-            <div className="flex gap-4">
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <span className="w-4 h-0 border-t-2 border-primary inline-block" />
-                Actual
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <span className="w-4 h-0 border-t-[1.5px] border-dashed border-primary/60 inline-block" />
-                Predicted
-              </span>
-            </div>
-          }
-        >
-          <PredictionsOverviewBody
-            boreholeId={boreholeId}
-            criticalLow={borehole.critical_low_level}
-            optimalHigh={borehole.optimal_high_level}
-          />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0">
+        <ChartCard title="Groundwater level" subtitle="Height above the pressure sensor (m)" viewHref={pressureSensor ? `/boreholes/${boreholeId}/sensors/${pressureSensor.id}` : undefined}>
+          <WaterLevelOverviewBody boreholeId={boreholeId} sensor={pressureSensor} sensorsPending={sensorsQuery.isPending} criticalLow={borehole.critical_low_level} optimalHigh={borehole.optimal_high_level} range={range}/>
         </ChartCard>
-
-        <ChartCard
-          title="Flow (24h)"
-          subtitle="Abstraction rate from the flow meter"
-          viewHref={
-            flowSensor && boreholeId !== undefined
-              ? `/boreholes/${boreholeId}/sensors/${flowSensor.id}`
-              : undefined
-          }
-        >
-          <FlowOverviewBody
-            boreholeId={boreholeId}
-            sensor={flowSensor}
-            sensorsPending={sensorsQuery.isPending}
-          />
+        <ChartCard title="Recorded flow" subtitle={range === "day" ? "Rate in L/min" : "Daily abstracted volume (L)"} viewHref={flowSensor ? `/boreholes/${boreholeId}/sensors/${flowSensor.id}` : undefined}>
+          <FlowOverviewBody boreholeId={boreholeId} sensor={flowSensor} sensorsPending={sensorsQuery.isPending} range={range}/>
         </ChartCard>
       </div>
     </div>
@@ -367,17 +313,26 @@ function StatusStrip({
   locationId: number | undefined
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-xl border border-border overflow-hidden bg-card min-w-0">
-      <WaterLevelCell
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
+      <MetricCard><WaterLevelCell
         boreholeId={boreholeId}
         pressureSensor={pressureSensor}
         sensorsPending={sensorsPending}
         criticalLow={criticalLow}
         optimalHigh={optimalHigh}
-      />
-      <PumpStatusCell boreholeId={boreholeId} />
-      <PumpRunCell boreholeId={boreholeId} />
-      <WeatherCell locationId={locationId} />
+      /></MetricCard>
+      <MetricCard><PumpStatusCell boreholeId={boreholeId} /></MetricCard>
+      <MetricCard><PumpRunCell boreholeId={boreholeId} /></MetricCard>
+      <MetricCard><WeatherCell locationId={locationId} /></MetricCard>
+    </div>
+  )
+}
+
+/** One metric card in the top strip: card surface, accent bar, no inner borders. */
+function MetricCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative rounded-xl border border-border bg-card overflow-hidden min-w-0">
+      {children}
     </div>
   )
 }
@@ -396,7 +351,7 @@ function StatusCell({
   return (
     <div
       className={cn(
-        "relative px-4 py-3.5 flex flex-col gap-1.5 border-b sm:border-b-0 sm:border-r border-border/70 last:border-r-0 last:border-b-0",
+        "relative px-4 py-3.5 flex flex-col gap-1.5 min-w-0",
         className,
       )}
     >
@@ -748,74 +703,6 @@ function WeatherStat({
 
 // ─── Chart cards ─────────────────────────────────────────────────────────────
 
-function CylinderCard({
-  borehole,
-  boreholeId,
-  pressureSensor,
-  sensorsPending,
-}: {
-  borehole: Borehole
-  boreholeId: number | undefined
-  pressureSensor: SensorPublic | undefined
-  sensorsPending: boolean
-}) {
-  const latestQuery = useReadingsPage(
-    "water-level",
-    boreholeId,
-    pressureSensor?.id,
-    0,
-    1,
-  )
-  const latest = latestQuery.data?.items[0]
-  const currentLevel = latest?.water_level ?? null
-
-  const hasSensor = pressureSensor !== undefined
-  const isPending = sensorsPending || (hasSensor && latestQuery.isPending)
-
-  return (
-    <div
-      className="w-full flex flex-col overflow-hidden rounded-xl border border-border lg:h-full"
-      style={{
-        background:
-          "linear-gradient(160deg, var(--color-card) 0%, rgba(18,39,48,0.6) 100%)",
-      }}
-    >
-      <div className="px-4 pt-4 pb-1.5">
-        <div className="font-heading text-base font-medium leading-snug">
-          Water level
-        </div>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Where the water sits right now
-        </p>
-      </div>
-      <div className="flex-1 flex flex-col">
-        {!hasSensor && !sensorsPending ? (
-          <div className="h-72 md:h-80 lg:flex-1 flex items-center justify-center text-center px-4">
-            <p className="text-sm text-muted-foreground">
-              No pressure transducer installed on this borehole yet.
-            </p>
-          </div>
-        ) : (
-          <div className="h-72 md:h-80 flex items-center justify-center min-h-0 min-w-0 px-2">
-            <BoreholeCylinder
-              totalDepth={borehole.total_depth}
-              criticalLow={borehole.critical_low_level}
-              optimalHigh={borehole.optimal_high_level}
-              currentLevel={currentLevel}
-              isPending={isPending}
-            />
-          </div>
-        )}
-        {latest && (
-          <p className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-muted-foreground text-center pb-3 [font-variant-numeric:tabular-nums]">
-            As of {formatShortTs(latest.captured_at)}
-          </p>
-        )}
-      </div>
-    </div>
-  )
-}
-
 /**
  * Fixed-height chart card. Load-bearing invariants:
  *   - `h-72 md:h-80` gives ResponsiveContainer a definite parent height.
@@ -885,14 +772,16 @@ function WaterLevelOverviewBody({
   sensorsPending,
   criticalLow,
   optimalHigh,
+  range,
 }: {
   boreholeId: number | undefined
+  range: ChartRange
   sensor: SensorPublic | undefined
   sensorsPending: boolean
   criticalLow: number
   optimalHigh: number
 }) {
-  const chartQuery = useWaterLevelChart(boreholeId, sensor?.id, "day")
+  const chartQuery = useWaterLevelChart(boreholeId, sensor?.id, range)
   return (
     <OverviewChartArea
       hasSensor={sensor !== undefined}
@@ -907,11 +796,11 @@ function WaterLevelOverviewBody({
       onRetry={() => chartQuery.refetch()}
       data={chartQuery.data}
       missingSensorText="No pressure transducer on this borehole."
-      emptyText="No water-level readings for the last 24 hours."
+      emptyText="No water-level readings in this window."
       render={(points) => (
         <WaterLevelChart
           points={points}
-          range="day"
+          range={range}
           criticalLow={criticalLow}
           optimalHigh={optimalHigh}
         />
@@ -924,108 +813,65 @@ function FlowOverviewBody({
   boreholeId,
   sensor,
   sensorsPending,
+  range,
 }: {
+  range: ChartRange
   boreholeId: number | undefined
   sensor: SensorPublic | undefined
   sensorsPending: boolean
 }) {
-  const chartQuery = useFlowChart(boreholeId, sensor?.id, "day")
-  return (
-    <OverviewChartArea
-      hasSensor={sensor !== undefined}
-      sensorsPending={sensorsPending}
-      chartPending={chartQuery.isPending}
-      chartError={chartQuery.isError}
-      errorMessage={
-        chartQuery.error instanceof ApiError
-          ? chartQuery.error.message
-          : "Couldn't load readings."
-      }
-      onRetry={() => chartQuery.refetch()}
-      data={chartQuery.data}
-      missingSensorText="No flow meter on this borehole."
-      emptyText="No flow readings for the last 24 hours."
-      render={(points) => <FlowChart points={points} range="day" />}
-    />
+  const chartQuery = useFlowChart(boreholeId, sensor?.id, range)
+  // Pump-run windows power the week/month daily-volume aggregation. Same
+  // query key as PumpRunCell, so the dashboard already has it cached — no
+  // extra request when both render.
+  const pumpWindowsQuery = usePumpWindows(boreholeId)
+  const volumeMode = range !== "day"
+  const dailyVolumes = useMemo(
+    () =>
+      !volumeMode || !pumpWindowsQuery.data
+        ? undefined
+        : buildDailyVolumes(pumpWindowsQuery.data, range, Date.now()),
+    [volumeMode, range, pumpWindowsQuery.data],
   )
-}
-
-function PredictionsOverviewBody({
-  boreholeId,
-  criticalLow,
-  optimalHigh,
-}: {
-  boreholeId: number | undefined
-  criticalLow: number
-  optimalHigh: number
-}) {
-  const chartQuery = usePredictionChart(boreholeId, "day")
-  return (
-    <PredictionOverviewChartArea
-      pending={chartQuery.isPending}
-      error={chartQuery.isError}
-      errorMessage={
-        chartQuery.error instanceof ApiError
-          ? chartQuery.error.message
-          : "Couldn't load predictions."
-      }
-      onRetry={() => chartQuery.refetch()}
-      data={chartQuery.data}
-      render={(points) => (
-        <PredictionChart
-          points={points}
-          range="day"
-          criticalLow={criticalLow}
-          optimalHigh={optimalHigh}
-        />
-      )}
-    />
-  )
-}
-
-function PredictionOverviewChartArea({
-  pending,
-  error,
-  errorMessage,
-  onRetry,
-  data,
-  render,
-}: {
-  pending: boolean
-  error: boolean
-  errorMessage: string
-  onRetry: () => void
-  data: PredictionChartPoint[] | undefined
-  render: (points: PredictionChartPoint[]) => React.ReactNode
-}) {
-  if (pending) {
-    return <Skeleton className="flex-1 min-h-0 min-w-0 w-full" />
-  }
-  if (error) {
+  // In volume mode the rate series is irrelevant: pending/error state and
+  // empty checks track the pump-windows query, and a window with no runs
+  // still renders (empty axis + "no activity" caption inside the chart).
+  const volumeUnavailable = volumeMode && (pumpWindowsQuery.isError || (pumpWindowsQuery.isPending && !pumpWindowsQuery.data))
+  if (volumeUnavailable) {
     return (
-      <div className="flex flex-col gap-3 items-start">
-        <p className="text-destructive text-sm">{errorMessage}</p>
-        <Button variant="outline" size="sm" onClick={onRetry}>
+      <div className="flex-1 flex flex-col gap-3 items-start justify-center">
+        <p className="text-muted-foreground text-sm max-w-xs">
+          Daily volume needs pump-run data, which isn't available for this
+          borehole yet.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => pumpWindowsQuery.refetch()}>
           Try again
         </Button>
       </div>
     )
   }
-  // A line/area needs ≥2 points to draw anything meaningful. With one
-  // point Recharts renders a lonely dot in a giant grid, which reads
-  // as broken. Treat that as "not enough data yet".
-  if (!data || data.length < 2) {
-    return (
-      <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center text-center">
-        <p className="text-muted-foreground text-sm max-w-xs">
-          Not enough predictions yet — the model needs more historical
-          readings before the forecast line has shape.
-        </p>
-      </div>
-    )
-  }
   return (
-    <div className="flex-1 w-full min-h-0 min-w-0">{render(data)}</div>
+    <OverviewChartArea
+      hasSensor={sensor !== undefined}
+      sensorsPending={sensorsPending}
+      chartPending={volumeMode ? pumpWindowsQuery.isPending : chartQuery.isPending}
+      chartError={volumeMode ? pumpWindowsQuery.isError : chartQuery.isError}
+      errorMessage={
+        volumeMode
+          ? "Couldn't load pump runs."
+          : chartQuery.error instanceof ApiError
+            ? chartQuery.error.message
+            : "Couldn't load readings."
+      }
+      onRetry={() => {
+        chartQuery.refetch()
+        pumpWindowsQuery.refetch()
+      }}
+      data={volumeMode ? chartQuery.data ?? [{ t: new Date().toISOString(), value: null }] : chartQuery.data}
+      missingSensorText="No flow meter on this borehole."
+      emptyText="No flow readings in this window."
+      render={(points) => <FlowChart points={points} range={range} dailyVolumes={dailyVolumes} />}
+    />
   )
 }
 

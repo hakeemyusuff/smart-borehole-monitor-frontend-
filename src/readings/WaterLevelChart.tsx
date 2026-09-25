@@ -1,9 +1,9 @@
 import { useId, useMemo } from "react"
 import {
   Area,
-  Bar,
+  AreaChart,
   CartesianGrid,
-  ComposedChart,
+  Dot,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -12,12 +12,9 @@ import {
 } from "recharts"
 import type { ChartPoint, ChartRange, RainChartPoint } from "@/lib/types"
 import { useIsNarrow } from "@/lib/useIsNarrow"
+import { prepareReadings, chartTick, formatWat, isIsolatedPoint } from "./chart-data"
 
-type Point = {
-  t: number
-  value: number | null
-  rain?: number
-}
+type Point = { t: number; value: number | null }
 
 export function WaterLevelChart({
   points,
@@ -30,262 +27,208 @@ export function WaterLevelChart({
   range: ChartRange
   criticalLow?: number
   optimalHigh?: number
-  // Optional recharge context. When provided, rain renders as bars on a
-  // secondary (right-hand) axis so "it rained → level rose" is visible
-  // without competing with the level line.
+  /** Recharge context — rendered as a separate strip below, sharing the same time domain. */
   rainPoints?: RainChartPoint[]
 }) {
   const gradientId = useId()
   const narrow = useIsNarrow()
 
-  const hasRain = !!rainPoints && rainPoints.length > 0
+  const data = useMemo<Point[]>(
+    () =>
+      // Gap markers are dropped before rendering: lines must read as one
+      // continuous stroke across missing windows (prepareReadings still
+      // injects them for its contract, but a null row here would surface a
+      // fake "no reading" tooltip entry mid-gap).
+      prepareReadings(points, range, "level").filter((p) => p.value !== null),
+    [points, range],
+  )
 
-  const data = useMemo<Point[]>(() => {
-    // Merge water level + optional rain into one series keyed by
-    // timestamp. Rain and level don't necessarily share timestamps
-    // (rain is hourly, level buckets vary by range), so union them and
-    // leave the unfilled side as undefined — Recharts skips missing
-    // dataKeys per-point.
-    const byT = new Map<number, Point>()
-    for (const p of points) {
-      const t = new Date(p.t).getTime()
-      byT.set(t, { t, value: p.value })
-    }
-    if (rainPoints) {
-      for (const r of rainPoints) {
-        const t = new Date(r.t).getTime()
-        const existing = byT.get(t)
-        if (existing) existing.rain = r.precipitation
-        else byT.set(t, { t, value: null, rain: r.precipitation })
-      }
-    }
-    return [...byT.values()].sort((a, b) => a.t - b.t)
-  }, [points, rainPoints])
+  const rain = useMemo<Point[]>(
+    () =>
+      (rainPoints ?? [])
+        .map((p) => ({ t: Date.parse(p.t), value: p.precipitation }))
+        .filter((p) => Number.isFinite(p.t) && p.value !== null),
+    [rainPoints],
+  )
+
+  // One shared time domain for the level plot AND the rain strip: the two
+  // plots then line up column-for-column, so "it rained → level rose" reads
+  // vertically instead of being two unrelated x-scales.
+  const timeDomain = useMemo<[number, number]>(() => {
+    const ts = [...data, ...rain].map((p) => p.t).filter(Number.isFinite)
+    if (ts.length === 0) return [0, 1]
+    if (ts.length === 1) return [ts[0] - 3_600_000, ts[0] + 3_600_000]
+    return [Math.min(...ts), Math.max(...ts)]
+  }, [data, rain])
 
   const yDomain = useMemo<[number, number]>(() => {
-    const numeric = data
-      .map((d) => d.value)
-      .filter((v): v is number => v !== null)
-    if (numeric.length === 0) return [0, 1]
-    const rawMin = Math.min(...numeric)
-    const rawMax = Math.max(...numeric)
+    const values = data.flatMap((p) => (p.value === null ? [] : [p.value]))
+    if (values.length === 0) return [0, 1]
     const thresholds = [criticalLow, optimalHigh].filter(
       (v): v is number => v !== undefined,
     )
-    const min = Math.min(rawMin, ...thresholds)
-    const max = Math.max(rawMax, ...thresholds)
-    const padding = Math.max(1.5, (max - min) * 0.1)
-    return [min - padding, max + padding]
+    const min = Math.min(...values, ...thresholds)
+    const max = Math.max(...values, ...thresholds)
+    const padding = Math.max(0.5, (max - min) * 0.15)
+    return [Math.max(0, min - padding), max + padding]
   }, [data, criticalLow, optimalHigh])
 
-  if (data.length === 0) return null
-
-  // Mobile-tightened geometry: shave the y-axis gutter so the plot area
-  // isn't crushed on 375px, and skip the destructive/optimal reference
-  // labels (they collide with tick labels — the dashed line + colour is
-  // enough context; the tooltip carries the exact value).
-  const levelAxisWidth = narrow ? 32 : 44
-  const rainAxisWidth = narrow ? 28 : 36
-  const rightMargin = hasRain ? (narrow ? 4 : 40) : narrow ? 4 : 12
-  const showRefLabels = !narrow
-  const tickFontSize = narrow ? 10 : 11
-
-  return (
-    <div className="w-full h-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart
-          data={data}
-          margin={{ top: 12, right: rightMargin, left: 0, bottom: 8 }}
-        >
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-
-          <CartesianGrid
-            stroke="var(--border)"
-            strokeDasharray="2 4"
-            vertical={false}
-          />
-
-          <XAxis
-            dataKey="t"
-            type="number"
-            domain={["dataMin", "dataMax"]}
-            tickFormatter={(ts: number) => formatTick(ts, range, narrow)}
-            stroke="var(--muted-foreground)"
-            tick={{ fill: "var(--muted-foreground)", fontSize: tickFontSize }}
-            axisLine={{ stroke: "var(--border)" }}
-            tickLine={{ stroke: "var(--border)" }}
-            minTickGap={narrow ? 32 : 40}
-          />
-          <YAxis
-            yAxisId="level"
-            stroke="var(--muted-foreground)"
-            tick={{ fill: "var(--muted-foreground)", fontSize: tickFontSize }}
-            axisLine={{ stroke: "var(--border)" }}
-            tickLine={{ stroke: "var(--border)" }}
-            width={levelAxisWidth}
-            domain={yDomain}
-            tickFormatter={(v: number) => v.toFixed(0)}
-            tickCount={narrow ? 4 : 5}
-          />
-          {hasRain && (
-            <YAxis
-              yAxisId="rain"
-              orientation="right"
-              stroke="var(--muted-foreground)"
-              tick={{ fill: "var(--muted-foreground)", fontSize: narrow ? 9 : 10 }}
-              axisLine={{ stroke: "var(--border)" }}
-              tickLine={{ stroke: "var(--border)" }}
-              width={rainAxisWidth}
-              domain={[0, (dataMax: number) => Math.max(4, Math.ceil(dataMax * 1.2))]}
-              tickFormatter={(v: number) => `${v}`}
-              tickCount={narrow ? 3 : 5}
-            />
-          )}
-
-          {criticalLow !== undefined && (
-            <ReferenceLine
-              yAxisId="level"
-              y={criticalLow}
-              stroke="var(--destructive)"
-              strokeDasharray="4 4"
-              strokeOpacity={0.7}
-              label={
-                showRefLabels
-                  ? {
-                      value: `Critical ${criticalLow}m`,
-                      position: "insideBottomLeft",
-                      fill: "var(--destructive)",
-                      fontSize: 10,
-                      dy: -4,
-                    }
-                  : undefined
-              }
-            />
-          )}
-          {optimalHigh !== undefined && (
-            <ReferenceLine
-              yAxisId="level"
-              y={optimalHigh}
-              stroke="var(--muted-foreground)"
-              strokeDasharray="4 4"
-              strokeOpacity={0.6}
-              label={
-                showRefLabels
-                  ? {
-                      value: `Optimal ${optimalHigh}m`,
-                      position: "insideTopLeft",
-                      fill: "var(--muted-foreground)",
-                      fontSize: 10,
-                      dy: 12,
-                    }
-                  : undefined
-              }
-            />
-          )}
-
-          {/* Rain bars sit BEHIND the level area so they read as backdrop
-              context. Muted-foreground at low opacity keeps them clearly
-              secondary to the teal level line. */}
-          {hasRain && (
-            <Bar
-              yAxisId="rain"
-              dataKey="rain"
-              fill="#5B9BD5"
-              fillOpacity={0.25}
-              isAnimationActive={false}
-              maxBarSize={12}
-            />
-          )}
-
-          <Area
-            yAxisId="level"
-            type="monotone"
-            dataKey="value"
-            stroke="var(--primary)"
-            strokeWidth={2}
-            fill={`url(#${gradientId})`}
-            isAnimationActive
-            animationDuration={600}
-            dot={false}
-            activeDot={{
-              r: 4,
-              fill: "var(--primary)",
-              stroke: "var(--background)",
-              strokeWidth: 2,
-            }}
-          />
-
-          <Tooltip
-            cursor={{
-              stroke: "var(--primary)",
-              strokeOpacity: 0.4,
-              strokeDasharray: "3 3",
-            }}
-            content={<WaterLevelTooltip hasRain={hasRain} />}
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
-function formatTick(ts: number, range: ChartRange, narrow = false): string {
-  const d = new Date(ts)
-  if (range === "day") {
-    // Drop minutes on narrow screens ("14" vs "14:00") — 2-digit hour is
-    // still unambiguous inside a 24h chart window.
-    return narrow
-      ? d.toLocaleTimeString(undefined, { hour: "2-digit" })
-      : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-  }
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  })
-}
-
-function formatFullTs(ts: number): string {
-  return new Date(ts).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
-type TooltipProps = {
-  active?: boolean
-  payload?: { payload: Point }[]
-  hasRain?: boolean
-}
-
-function WaterLevelTooltip({ active, payload, hasRain }: TooltipProps) {
-  if (!active || !payload || payload.length === 0) return null
-  const point = payload[0].payload
-  return (
-    <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-lg shadow-black/40 min-w-40">
-      <p className="text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
-        {formatFullTs(point.t)}
+  if (data.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No valid level observations in this window.
       </p>
-      {point.value !== null ? (
-        <p className="mt-1 flex items-baseline gap-1.5">
-          <span className="text-lg text-foreground [font-variant-numeric:tabular-nums]">
-            {point.value.toFixed(2)}
-          </span>
-          <span className="text-xs text-muted-foreground">m</span>
-        </p>
-      ) : (
-        <p className="mt-1 text-sm text-muted-foreground">No reading</p>
-      )}
-      {hasRain && point.rain !== undefined && (
-        <p className="mt-1 pt-1 border-t border-border/60 text-xs text-muted-foreground [font-variant-numeric:tabular-nums]">
-          Rain <span className="text-foreground">{point.rain.toFixed(1)} mm</span>
-        </p>
+    )
+  }
+
+  const showRain = rain.length > 0
+  const tickFontSize = narrow ? 10 : 11
+  const gapThreshold = range === "month" ? 36 * 3_600_000 : range === "week" ? 1.5 * 3_600_000 : 3_600_000
+
+  return (
+    <div className="w-full h-full min-w-0 flex flex-col">
+      <div className="flex-1 min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            data={data}
+            margin={{ top: 12, right: narrow ? 4 : 14, left: 0, bottom: 4 }}
+          >
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="var(--border)" strokeDasharray="3 5" vertical={false} />
+            <XAxis
+              dataKey="t"
+              type="number"
+              domain={timeDomain}
+              tickFormatter={(t: number) => chartTick(t, range)}
+              tick={{ fill: "var(--muted-foreground)", fontSize: tickFontSize }}
+              stroke="var(--border)"
+              tickLine={{ stroke: "var(--border)" }}
+              minTickGap={35}
+            />
+            <YAxis
+              domain={yDomain}
+              tickFormatter={(v: number) => v.toFixed(1)}
+              width={narrow ? 36 : 44}
+              tick={{ fill: "var(--muted-foreground)", fontSize: tickFontSize }}
+              stroke="var(--border)"
+              tickLine={{ stroke: "var(--border)" }}
+            />
+            {criticalLow !== undefined && (
+              <ReferenceLine
+                y={criticalLow}
+                stroke="var(--destructive)"
+                strokeDasharray="4 4"
+                strokeOpacity={0.8}
+                label={{
+                  value: `Critical ${criticalLow}m`,
+                  position: "insideBottomLeft",
+                  fill: "var(--destructive)",
+                  fontSize: 10,
+                  dy: -4,
+                }}
+              />
+            )}
+            {optimalHigh !== undefined && (
+              <ReferenceLine
+                y={optimalHigh}
+                stroke="var(--muted-foreground)"
+                strokeDasharray="4 4"
+                strokeOpacity={0.6}
+                label={{
+                  value: `Optimal ${optimalHigh}m`,
+                  position: "insideTopLeft",
+                  fill: "var(--muted-foreground)",
+                  fontSize: 10,
+                  dy: 12,
+                }}
+              />
+            )}
+            <Area
+              type="linear"
+              dataKey="value"
+              name={range === "day" ? "Measured level" : "Average level"}
+              unit=" m"
+              stroke="var(--primary)"
+              fill={`url(#${gradientId})`}
+              strokeWidth={2}
+              connectNulls
+              isAnimationActive={false}
+              // Dots only on isolated readings: connected stretches stay
+              // clean lines, but lone points would otherwise vanish.
+              dot={(props) => {
+                const isolated = isIsolatedPoint(data, props.index, gapThreshold)
+                if (!isolated || props.cx == null || props.cy == null) return null
+                return (
+                  <Dot
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={narrow ? 2.5 : 3.5}
+                    fill="var(--primary)"
+                    stroke="var(--background)"
+                    strokeWidth={1.5}
+                  />
+                )
+              }}
+              activeDot={{ r: 5 }}
+            />
+            <Tooltip
+              labelFormatter={(v) => formatWat(Number(v))}
+              formatter={(v) => [`${Number(v).toFixed(3)} m`, range === "day" ? "Measured" : "Average"]}
+              contentStyle={{
+                background: "var(--popover)",
+                color: "var(--popover-foreground)",
+                borderColor: "var(--border)",
+                borderRadius: 10,
+              }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      {showRain && (
+        <div className="h-20 shrink-0 border-t border-border pt-1 mt-2">
+          <p className="text-[10px] text-muted-foreground">
+            Weather precipitation snapshots (mm) · separate from measured groundwater
+          </p>
+          <ResponsiveContainer width="100%" height="70%">
+            <AreaChart data={rain} margin={{ left: narrow ? 36 : 44, right: narrow ? 4 : 14, top: 4 }}>
+              <XAxis
+                dataKey="t"
+                type="number"
+                domain={timeDomain}
+                tickFormatter={(t: number) => chartTick(t, range)}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
+                stroke="var(--border)"
+                tickLine={false}
+                minTickGap={40}
+              />
+              <YAxis hide domain={[0, (dataMax: number) => Math.max(2, Math.ceil(dataMax * 1.2))]} />
+              <Area
+                dataKey="value"
+                name="Precipitation snapshot"
+                stroke="#60a5fa"
+                fill="#60a5fa"
+                fillOpacity={0.15}
+                dot={false}
+                isAnimationActive={false}
+              />
+              <Tooltip
+                labelFormatter={(v) => formatWat(Number(v))}
+                formatter={(v) => [`${Number(v).toFixed(2)} mm`, "Snapshot"]}
+                contentStyle={{
+                  background: "var(--popover)",
+                  color: "var(--popover-foreground)",
+                  borderColor: "var(--border)",
+                  borderRadius: 10,
+                }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </div>
   )

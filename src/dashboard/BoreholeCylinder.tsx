@@ -1,244 +1,102 @@
 import { useId } from "react"
 
 /**
- * The dashboard's signature visual: a vertical borehole with water filled to
- * the current level. The cylinder is scaled so `total_depth` fills the frame;
- * the water rises from the bottom. Optimal / critical horizontal marks are
- * drawn as dashed lines with side labels.
- *
- * The reading is clamped to [0, total_depth] for drawing purposes but the
- * actual value passes through untouched to the caller's readout.
+ * A shared visual scale for height above the sensor; not a stored-volume gauge.
+ * Critical (red) and optimal (muted) threshold marks are drawn as dashed lines
+ * so the current level can be read against the borehole's configured bands.
  */
 export function BoreholeCylinder({
   totalDepth,
-  criticalLow,
-  optimalHigh,
   currentLevel,
   isPending,
+  criticalLow,
+  optimalHigh,
+  variant = "measured",
 }: {
   totalDepth: number
-  criticalLow: number
-  optimalHigh: number
   currentLevel: number | null
   isPending?: boolean
+  criticalLow?: number
+  optimalHigh?: number
+  variant?: "measured" | "forecast"
 }) {
-  const gradientId = useId()
-  const waveClipId = useId()
-  const waveId = useId()
-
-  // Drawing coords (viewBox 240 x 480). The cylinder's inner area holds the
-  // water. Room on the right for threshold labels.
-  const VB_W = 240
-  const VB_H = 480
-  const CYL_X = 44
-  const CYL_W = 96
-  const CYL_TOP = 24
-  const CYL_BOTTOM = 456
-  const CYL_H = CYL_BOTTOM - CYL_TOP
-
-  const clamp = (v: number) => Math.max(0, Math.min(totalDepth, v))
-
-  // A higher water_level means MORE water, so the water surface sits closer
-  // to the top of the cylinder. yFor(level) maps a level to its screen y.
-  const yFor = (level: number) => {
-    const frac = clamp(level) / totalDepth
-    return CYL_BOTTOM - frac * CYL_H
-  }
-
-  const currentDrawn = currentLevel ?? 0
-  const waterTopY = yFor(currentDrawn)
-  const criticalY = yFor(criticalLow)
-  const optimalY = yFor(optimalHigh)
-
+  const id = useId()
+  const scale = Number.isFinite(totalDepth) && totalDepth > 0 ? totalDepth : 12
+  const valid = currentLevel !== null && Number.isFinite(currentLevel)
+  // 0 m (sensor) sits at y=260; the cylinder top is y=32.
+  const yFor = (level: number) => 260 - (Math.max(0, Math.min(scale, level)) / scale) * 228
+  const y = yFor(valid ? currentLevel : 0)
+  const color = variant === "forecast" ? "#c084fc" : "var(--primary)"
+  const criticalY = criticalLow !== undefined ? yFor(criticalLow) : null
+  const optimalY = optimalHigh !== undefined ? yFor(optimalHigh) : null
   return (
     <svg
-      viewBox={`0 0 ${VB_W} ${VB_H}`}
-      preserveAspectRatio="xMidYMid meet"
-      className="w-full h-full max-h-full block"
+      viewBox="0 0 190 294"
       role="img"
-      aria-label={`Borehole cylinder: current level ${
-        currentLevel !== null ? currentLevel.toFixed(2) : "unknown"
-      } meters of ${totalDepth} meter depth`}
+      aria-label={`${variant === "forecast" ? "Forecast" : "Measured"} water column: ${
+        valid ? `${currentLevel.toFixed(3)} metres above sensor` : "unavailable"
+      }`}
+      className="w-full h-full max-h-64"
     >
       <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.55} />
-          <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.85} />
+        <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={color} stopOpacity=".65" />
+          <stop offset="1" stopColor={color} stopOpacity=".16" />
         </linearGradient>
-
-        {/* A sine wave path used both as the water surface and to clip the
-            water fill so the top edge undulates instead of being flat. */}
-        <path
-          id={waveId}
-          d={`M 0 6 C 12 0, 24 12, 36 6 S 60 0, 72 6 S 96 12, 108 6 L 120 6 L 120 20 L 0 20 Z`}
-        />
-
-        <clipPath id={waveClipId}>
-          <rect
-            x={CYL_X}
-            y={CYL_TOP}
-            width={CYL_W}
-            height={CYL_H}
-            rx={CYL_W / 2}
-          />
+        <clipPath id={`${id}-clip`}>
+          <rect x="62" y="32" width="82" height="228" rx="16" />
         </clipPath>
       </defs>
-
-      {/* Water-level ticks on the left. Higher values sit higher up:
-          water_level counts UP from the borehole floor, so 0m is the
-          empty bottom and totalDepth is the "full to the top" reading. */}
-      <DepthTick y={CYL_TOP} label={`${totalDepth.toFixed(0)}m`} />
-      <DepthTick y={CYL_TOP + CYL_H / 2} label={`${(totalDepth / 2).toFixed(0)}m`} />
-      <DepthTick y={CYL_BOTTOM} label="0m" />
-
-      {/* Cylinder outline (rounded pill shape). */}
+      {[0, scale / 2, scale].map((v) => (
+        <g key={v}>
+          <text x="46" y={264 - (v / scale) * 228} textAnchor="end" fill="var(--muted-foreground)" fontSize="11">
+            {v.toFixed(1)}
+          </text>
+          <line x1="51" x2="59" y1={260 - (v / scale) * 228} y2={260 - (v / scale) * 228} stroke="var(--border)" />
+        </g>
+      ))}
       <rect
-        x={CYL_X}
-        y={CYL_TOP}
-        width={CYL_W}
-        height={CYL_H}
-        rx={CYL_W / 2}
-        fill="var(--card)"
-        stroke="var(--border)"
-        strokeWidth={1.5}
-      />
-
-      {/* Water fill, clipped to the cylinder so it rounds at the bottom. */}
-      <g clipPath={`url(#${waveClipId})`}>
-        <rect
-          x={CYL_X}
-          y={waterTopY}
-          width={CYL_W}
-          height={CYL_BOTTOM - waterTopY}
-          fill={`url(#${gradientId})`}
-        />
-        {/* Undulating surface — a thin wave sitting on the water level.
-            The <animateTransform> gently slides it horizontally forever. */}
-        {currentLevel !== null && (
-          <g transform={`translate(${CYL_X}, ${waterTopY - 6})`}>
-            <use
-              href={`#${waveId}`}
-              fill="var(--primary)"
-              opacity={0.9}
-              transform="translate(-24 0)"
-            >
-              <animateTransform
-                attributeName="transform"
-                type="translate"
-                from="-24 0"
-                to="0 0"
-                dur="4s"
-                repeatCount="indefinite"
-              />
-            </use>
-          </g>
-        )}
-      </g>
-
-      {/* Threshold lines OVER the fill so they're always visible. */}
-      <ThresholdLine
-        y={optimalY}
-        cylX={CYL_X}
-        cylW={CYL_W}
-        color="var(--primary)"
-        label={`Optimal ${optimalHigh}m`}
-        anchor="above"
-      />
-      <ThresholdLine
-        y={criticalY}
-        cylX={CYL_X}
-        cylW={CYL_W}
-        color="var(--destructive)"
-        label={`Critical ${criticalLow}m`}
-        anchor="below"
-      />
-
-      {/* Loading shimmer — draw a translucent overlay on the water area. */}
-      {isPending && (
-        <rect
-          x={CYL_X}
-          y={CYL_TOP}
-          width={CYL_W}
-          height={CYL_H}
-          rx={CYL_W / 2}
-          fill="var(--muted-foreground)"
-          opacity={0.05}
-        >
-          <animate
-            attributeName="opacity"
-            values="0.05;0.15;0.05"
-            dur="1.4s"
-            repeatCount="indefinite"
-          />
-        </rect>
-      )}
-    </svg>
-  )
-}
-
-function DepthTick({ y, label }: { y: number; label: string }) {
-  return (
-    <g>
-      <line
-        x1={28}
-        y1={y}
-        x2={40}
-        y2={y}
-        stroke="var(--muted-foreground)"
-        strokeOpacity={0.6}
-        strokeWidth={1.5}
-      />
-      <text
-        x={24}
-        y={y + 5}
-        fontSize={16}
-        fontWeight={500}
-        fill="var(--muted-foreground)"
-        textAnchor="end"
-        style={{ fontVariantNumeric: "tabular-nums" }}
-      >
-        {label}
-      </text>
-    </g>
-  )
-}
-
-function ThresholdLine({
-  y,
-  cylX,
-  cylW,
-  color,
-  label,
-  anchor,
-}: {
-  y: number
-  cylX: number
-  cylW: number
-  color: string
-  label: string
-  anchor: "above" | "below"
-}) {
-  return (
-    <g>
-      <line
-        x1={cylX - 4}
-        y1={y}
-        x2={cylX + cylW + 4}
-        y2={y}
+        x="62"
+        y="32"
+        width="82"
+        height="228"
+        rx="16"
+        fill="var(--background)"
         stroke={color}
-        strokeDasharray="4 4"
-        strokeWidth={1.8}
-        strokeOpacity={0.9}
+        strokeOpacity=".35"
+        strokeDasharray={variant === "forecast" ? "5 4" : undefined}
       />
-      <text
-        x={cylX + cylW + 8}
-        y={anchor === "above" ? y - 5 : y + 18}
-        fontSize={18}
-        fontWeight={500}
-        fill={color}
-      >
-        {label}
+      {valid && !isPending && (
+        <g clipPath={`url(#${id}-clip)`}>
+          <rect x="62" y={y} width="82" height={260 - y} fill={`url(#${id}-fill)`} />
+          <path d={`M62 ${y} Q82 ${y - 5} 103 ${y} T144 ${y}`} fill="none" stroke={color} strokeWidth="2" />
+        </g>
+      )}
+      {criticalY !== null && (
+        <g>
+          <line x1="62" x2="144" y1={criticalY} y2={criticalY} stroke="var(--destructive)" strokeWidth="1.5" strokeDasharray="4 3" strokeOpacity=".9" />
+          <text x="150" y={criticalY + 3} fill="var(--destructive)" fontSize="8.5">
+            CRIT
+          </text>
+        </g>
+      )}
+      {optimalY !== null && (
+        <g>
+          <line x1="62" x2="144" y1={optimalY} y2={optimalY} stroke="var(--muted-foreground)" strokeWidth="1" strokeDasharray="3 3" strokeOpacity=".7" />
+          <text x="150" y={optimalY + 3} fill="var(--muted-foreground)" fontSize="8.5">
+            OPT
+          </text>
+        </g>
+      )}
+      {(!valid || isPending) && (
+        <text x="103" y="147" textAnchor="middle" fill="var(--muted-foreground)" fontSize="24">
+          {isPending ? "…" : "—"}
+        </text>
+      )}
+      <circle cx="103" cy="260" r="3" fill="var(--muted-foreground)" />
+      <text x="103" y="283" textAnchor="middle" fill="var(--muted-foreground)" fontSize="10">
+        Sensor reference · 0 m
       </text>
-    </g>
+    </svg>
   )
 }

@@ -34,6 +34,7 @@ npm run dev                    # http://localhost:5173
 | `npm run build`   | `tsc -b && vite build`                          |
 | `npm run preview` | Serve the production build locally              |
 | `npm run lint`    | Run `oxlint`                                    |
+| `npm test`        | Chart gap and forecast freshness checks (Node 22.6+) |
 
 ## Environment
 
@@ -59,23 +60,26 @@ VITE_API_BASE_URL=http://localhost:8000
 
 - **Auth** — register, login, protected routes.
 - **Locations → Boreholes → Sensors** drill-down, each with create dialogs.
-- **Sensor detail** — water-level or flow chart with Day / Week / Month range controls, a
-  true time-scale x-axis (so uneven point spacing renders honestly), threshold reference
-  lines, and client-side gap injection so flow charts don't bridge across between-pumping
-  idles.
-- **Dashboard** — location picker + prev/next borehole nav, a live borehole cylinder driven
-  by the true latest reading (paginated list, `limit=1` — not the day-chart's aggregated
-  point), overview water-level and flow charts (24h), and a labelled placeholder for pump
-  status until the backend endpoints land.
+- **Sensor detail** — Day / Week / Month charts with individual readings, hourly
+  averages and daily averages respectively. Isolated readings remain visible; gaps
+  remain gaps. Flow shows instantaneous rate (L/min) for the day view and total
+  daily abstracted volume (L, from pump-run windows) for week/month. Weather
+  snapshots have a separate plot so their timestamps cannot break the level line.
+  Includes CSV export.
+- **Dashboard** — measured and forecast cylinders share a height-above-sensor scale.
+  Forecast availability comes from the backend status endpoint, refreshes automatically,
+  and expires on the client if updates stop. The history chart shows forecast target
+  times alongside observed levels, including the first saved forecast as a single point.
+  Paired error is calculated only for the selected history window; it is not the thesis
+  evaluation score. CSV exports include timestamps and model versions.
 - **Data logs** — the raw transmissions table: cascading location/borehole/sensor selectors
   (URL-persisted), paginated `skip`/`limit` with "Showing X–Y of Z" + Prev/Next.
 
 ## Layout invariants
 
 - Root is `h-svh` + `overflow-hidden`; the app never window-scrolls.
-- The Dashboard locks entirely at `lg+` (widget grid uses `min-h-0` + `min-w-0` on every
-  level — this is the trick that stops Recharts' ResponsiveContainer from ratcheting the
-  grid wider on each resize).
+- The Dashboard scrolls within the app. Chart containers have explicit heights and
+  `min-w-0` so responsive charts cannot stretch the page beyond the viewport.
 - Every other page opts back into scrolling via `PageShell`, which supplies
   `overflow-y-auto` + max-width + padding. The sidebar stays put in both modes.
 
@@ -95,8 +99,19 @@ src/
   data-logs/   DataLogsPage + queries
 ```
 
-## Status
+## Checking the forecast display
 
-Frontend for objectives 1 and 2 of the project brief is complete: dashboard, sensor drill-down
-with charts, and data-logs table. Objective 3 (pump scheduling) is stubbed as an honest
-placeholder pending the backend endpoints.
+Run the backend normally and start this frontend with `npm run dev`. Log in, select
+its location and well, and inspect the dashboard:
+
+1. Compare the measured timestamp and value with the latest sensor reading.
+2. A fresh saved forecast shows its value, issue time and target time in WAT.
+   Stale/unavailable forecasts leave the forecast cylinder empty with an explanation.
+3. Check Day, Week and Month on both sensor pages. Week/Month values are sample
+   averages over populated buckets, not complete interval coverage or pumped volume.
+4. Export forecast history for inspection. Missing observations stay blank until
+   matched by the backend; no confidence percentage is invented.
+
+These displays require the backend prediction status and chart endpoints. They do
+not train models, generate forecasts locally, or replace the scheduler. Tests use
+in-memory examples and do not contact Neon or modify sensor data.

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api"
 import { liveQueryOptions } from "@/lib/query-client"
-import type { ChartRange, PredictionChartPoint } from "@/lib/types"
+import type { ChartRange, PredictionChartPoint, PredictionStatus } from "@/lib/types"
 
 export const predictionKeys = {
   chart: (boreholeId: number, range: ChartRange) =>
@@ -28,6 +28,16 @@ export function usePredictionChart(
         `/api/predictions/${boreholeId}/chart?range_=${range}`,
       ),
     enabled,
+    ...liveQueryOptions,
+  })
+}
+
+
+export function usePredictionStatus(boreholeId: number | undefined) {
+  return useQuery({
+    queryKey: ["predictions", "status", boreholeId],
+    queryFn: () => api.get<PredictionStatus>(`/api/predictions/${boreholeId}/status`),
+    enabled: boreholeId !== undefined,
     ...liveQueryOptions,
   })
 }

@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { useBorehole } from "@/boreholes/queries"
 import { useSensor } from "@/sensors/queries"
 import { useFlowChart, useWaterLevelChart } from "@/readings/queries"
+import { usePumpWindows } from "@/pump/queries"
 import { useWeatherChart } from "@/weather/queries"
 import { FlowChart } from "@/readings/FlowChart"
 import { WaterLevelChart } from "@/readings/WaterLevelChart"
@@ -15,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageShell } from "@/components/PageShell"
 import { RangeSelector } from "@/components/RangeSelector"
 import { Skeleton } from "@/components/ui/skeleton"
+import { rangeDescription, downloadCsv, formatWat, buildDailyVolumes } from "@/readings/chart-data"
 
 export function SensorDetailPage() {
   const params = useParams<{ boreholeId: string; sensorId: string }>()
@@ -186,13 +188,13 @@ function WaterLevelPanel({
           <div className="min-w-0 flex flex-col gap-1">
             <CardTitle className="font-heading text-xl">Water level</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Readings from this sensor over time.
+              {rangeDescription[range]}. Height above the pressure sensor.
               {showRain && (
-                <> Blue bars show hourly rainfall for recharge context.</>
+                <> Weather snapshots are shown separately below.</>
               )}
             </p>
           </div>
-          {latest !== null && <LatestReadout value={latest} unit="m" />}
+          {latest !== null && <LatestReadout value={latest} unit="m" label={range === "day" ? "Latest in window" : "Latest bucket average"} />}
         </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <RangeSelector value={range} onChange={setRange} />
@@ -203,12 +205,13 @@ function WaterLevelPanel({
                 style={{ background: "#5B9BD5", opacity: 0.35 }}
                 aria-hidden
               />
-              Rainfall (mm)
+              Precipitation snapshots (mm)
             </span>
           )}
         </div>
       </CardHeader>
       <CardContent>
+        <ReadingSummary points={chartQuery.isError ? undefined : chartQuery.data} unit="m" range={range} filename={`water-level-${sensorId}-${range}`}/>
         <ChartArea
           query={chartQuery}
           emptyText="No readings for this window yet."
@@ -236,7 +239,41 @@ function FlowPanel({
 }) {
   const [range, setRange] = useState<ChartRange>("day")
   const chartQuery = useFlowChart(boreholeId, sensorId, range)
+  // Week/month plots daily abstracted volume from pump-run windows (the
+  // rate chart only makes sense at day granularity).
+  const pumpWindowsQuery = usePumpWindows(boreholeId)
+  const dailyVolumes = useMemo(
+    () =>
+      range === "day" || !pumpWindowsQuery.data || pumpWindowsQuery.isError
+        ? undefined
+        : buildDailyVolumes(pumpWindowsQuery.data, range, Date.now()),
+    [range, pumpWindowsQuery.data, pumpWindowsQuery.isError],
+  )
+  // Only a pump-windows failure blocks the volume chart; a window with no
+  // runs still renders (empty axis + "no activity" caption in the chart).
+  const volumeUnavailable = range !== "day" && pumpWindowsQuery.isError
   const latest = latestNonNullValue(chartQuery.data)
+
+  // In volume mode the rate series is irrelevant to the empty-state check —
+  // the pump may have run without the rate endpoint returning samples.
+  const areaQuery: ChartQueryLike =
+    range === "day"
+      ? chartQuery
+      : {
+          isPending: chartQuery.isPending || pumpWindowsQuery.isPending,
+          // A rate-endpoint failure must not block the volume chart — the
+          // volume series comes from pump windows, not the rate samples.
+          isError: false,
+          error: null,
+          data:
+            chartQuery.data && chartQuery.data.length > 0
+              ? chartQuery.data
+              : [{ t: new Date().toISOString(), value: null }],
+          refetch: () => {
+            chartQuery.refetch()
+            pumpWindowsQuery.refetch()
+          },
+        }
 
   return (
     <Card className="w-full">
@@ -245,19 +282,26 @@ function FlowPanel({
           <div className="min-w-0 flex flex-col gap-1">
             <CardTitle className="font-heading text-xl">Flow</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Aggregated flow readings — empty windows are between pumping events.
+              {range === "day"
+                ? `${rangeDescription[range]}. Missing records do not prove the pump was off.`
+                : "Total abstracted volume per calendar day, aggregated from pump-run windows."}
             </p>
           </div>
-          {latest !== null && <LatestReadout value={latest} />}
+          {latest !== null && <LatestReadout value={latest} unit="L/min" label={range === "day" ? "Latest in window" : "Latest bucket average"} />}
         </div>
         <RangeSelector value={range} onChange={setRange} />
       </CardHeader>
       <CardContent>
-        <ChartArea
-          query={chartQuery}
-          emptyText="No flow readings for this window."
-          render={(points) => <FlowChart points={points} range={range} />}
-        />
+        {range === "day" && <ReadingSummary points={chartQuery.isError ? undefined : chartQuery.data} unit="L/min" range={range} filename={`flow-${sensorId}-${range}`}/>}
+        {volumeUnavailable ? (
+          <p className="text-sm text-muted-foreground">Daily volume needs pump-run data for this borehole.</p>
+        ) : (
+          <ChartArea
+            query={areaQuery}
+            emptyText="No flow readings for this window."
+            render={(points) => <FlowChart points={points} range={range} dailyVolumes={dailyVolumes} />}
+          />
+        )}
       </CardContent>
     </Card>
   )
@@ -326,11 +370,11 @@ function PlaceholderPanel({
   )
 }
 
-function LatestReadout({ value, unit }: { value: number; unit?: string }) {
+function LatestReadout({ value, unit, label }: { value: number; unit?: string; label: string }) {
   return (
     <div className="flex flex-col items-end gap-0.5">
       <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-        Latest
+        {label}
       </span>
       <span className="text-2xl [font-variant-numeric:tabular-nums] text-foreground">
         {value.toFixed(2)}
@@ -359,4 +403,15 @@ function latestNonNullValue(points: ChartPoint[] | undefined): number | null {
     if (v !== null && v !== undefined) return v
   }
   return null
+}
+
+
+function ReadingSummary({ points, unit, range, filename }: { points?: ChartPoint[]; unit: string; range: ChartRange; filename: string }) {
+  const valid=(points ?? []).filter((p): p is ChartPoint & { value: number } => p.value !== null && Number.isFinite(p.value)).sort((a,b) => Date.parse(a.t)-Date.parse(b.t))
+  if (!valid.length) return null
+  const values=valid.map(p => p.value)
+  return <div className="mb-5 flex flex-wrap gap-4 items-center justify-between border-y border-border py-3">
+    <div className="flex flex-wrap gap-5 text-xs"><span><strong className="text-foreground">{valid.length}</strong> {range === "day" ? "readings" : "populated buckets"}</span><span>Min <strong>{Math.min(...values).toFixed(2)} {unit}</strong></span><span>Max <strong>{Math.max(...values).toFixed(2)} {unit}</strong></span><span className="text-muted-foreground">Latest point: {formatWat(valid.at(-1)!.t)}</span></div>
+    <Button size="sm" variant="outline" onClick={() => downloadCsv(`${filename}.csv`,["time_utc",`value_${unit === "m" ? "m" : "litres_per_minute"}`,"aggregation"],(points ?? []).map(p => [p.t,p.value,range === "day" ? "individual reading" : range === "week" ? "hourly sample average" : "daily sample average"]))}>Export CSV</Button>
+  </div>
 }

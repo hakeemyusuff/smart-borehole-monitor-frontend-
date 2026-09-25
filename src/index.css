@@ -66,6 +66,7 @@
     --accent: #1E3742;
     --accent-foreground: #E8E4D9;
     --destructive: #E76F5B;
+    --warning: #E9B44C;          /* Amber — between critical and optimal */
     --border: #1E3742;
     --input: #1E3742;
     --ring: #3ECFB3;
