@@ -57,7 +57,7 @@ export function startOfLagosDay(ts: number): number {
 export type DailyVolumePoint = {
   /** Start of the WAT calendar day (also the chart X value). */
   t: number
-  /** Total abstracted volume in litres; null when the pump never ran that day. */
+  /** Estimated abstracted volume in litres; null when no event is recorded. */
   volume: number | null
   /** Total pump runtime in minutes across the day's runs. */
   runtimeMin: number | null
@@ -86,9 +86,12 @@ export function buildDailyVolumes(
     // Clamp to the chart window — runs may straddle its edges. Volume is
     // pro-rated against the FULL run duration, so only the in-window share
     // of an edge-straddling run counts toward a day.
-    const runSpanMs = Math.max(runEnd - runStart, 1)
+    // Backend duration includes the estimated last sample interval; end is
+    // only the final sample timestamp. Keep single-sample events and runtime.
+    const runSpanMs = w.duration_min * 60_000
+    if (!Number.isFinite(runSpanMs) || runSpanMs <= 0 || !Number.isFinite(w.volume_litres) || w.volume_litres < 0) continue
     const from = Math.max(runStart, windowStart)
-    const to = Math.min(Math.max(runEnd, runStart), now)
+    const to = Math.min(runStart + runSpanMs, now)
     if (to <= from) continue
     let cursor = from
     while (cursor < to) {
@@ -159,4 +162,60 @@ export function downloadCsv(filename: string, headers: string[], rows: (string |
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }))
   const a = document.createElement("a"); a.href = url; a.download = filename; a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export function isRecommendationCurrent(
+  recommendation: { assessed_at: string; valid_until: string } | undefined,
+  now: number,
+  failed = false,
+) {
+  if (!recommendation || failed) return false
+  const assessed = Date.parse(recommendation.assessed_at)
+  return Number.isFinite(assessed) && assessed <= now && now - assessed < 120_000
+    && Date.parse(recommendation.valid_until) > now
+}
+
+/** Display-only bridges. Original observations/forecasts remain unchanged. */
+export function prepareForecastChart(points: import("../lib/types").PredictionChartPoint[]) {
+  const valid = (value: number | null) => value !== null && Number.isFinite(value) ? value : null
+  const sorted = points.map(p => ({ ...p, t: Date.parse(p.t) }))
+    .filter(p => Number.isFinite(p.t)).sort((a, b) => a.t - b.t)
+  // The API normally supplies null hourly buckets; also handle omitted buckets.
+  const expanded: typeof sorted = []
+  for (const p of sorted) {
+    const previous = expanded.at(-1)
+    if (previous && p.t - previous.t > HOUR) {
+      for (let t = previous.t + HOUR; t < p.t; t += HOUR) {
+        expanded.push({ t, predicted: null, actual: null, confidence: null, issued_at: null, model_version: null })
+      }
+    }
+    expanded.push(p)
+  }
+  const data = expanded.map(p => ({
+    ...p, predicted: valid(p.predicted), actual: valid(p.actual),
+    forecast_actual: valid(p.actual), // Recorded observations, not interpolated measurements.
+    forecast_interpolated: valid(p.actual),
+    predicted_interpolated: valid(p.predicted),
+    observation_bridge: false, prediction_bridge: false,
+  }))
+  for (const [source, destination, flag] of [
+    ["actual", "forecast_interpolated", "observation_bridge"],
+    ["predicted", "predicted_interpolated", "prediction_bridge"],
+  ] as const) {
+    let left = -1
+    data.forEach((point, right) => {
+      if (point[source] === null) return
+      if (left >= 0 && right > left + 1) {
+        const start = data[left]
+        const duration = point.t - start.t
+        for (let i = left + 1; i < right; i++) {
+          const fraction = (data[i].t - start.t) / duration
+          data[i][destination] = start[source]! + fraction * (point[source]! - start[source]!)
+          data[i][flag] = true
+        }
+      }
+      left = right
+    })
+  }
+  return data
 }

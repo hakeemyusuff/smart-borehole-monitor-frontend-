@@ -27,3 +27,8 @@ dist-ssr
 
 # Snapshotted backend API spec — regenerate locally, don't commit.
 openapi.json
+
+# Local environment settings
+.env
+.env.*
+!.env.example

@@ -35,11 +35,7 @@ export function WaterLevelChart({
 
   const data = useMemo<Point[]>(
     () =>
-      // Gap markers are dropped before rendering: lines must read as one
-      // continuous stroke across missing windows (prepareReadings still
-      // injects them for its contract, but a null row here would surface a
-      // fake "no reading" tooltip entry mid-gap).
-      prepareReadings(points, range, "level").filter((p) => p.value !== null),
+      prepareReadings(points, range, "level"),
     [points, range],
   )
 
@@ -156,7 +152,7 @@ export function WaterLevelChart({
               stroke="var(--primary)"
               fill={`url(#${gradientId})`}
               strokeWidth={2}
-              connectNulls
+              connectNulls={false}
               isAnimationActive={false}
               // Dots only on isolated readings: connected stretches stay
               // clean lines, but lone points would otherwise vanish.

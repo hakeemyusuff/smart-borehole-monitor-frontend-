@@ -142,3 +142,63 @@ test("forecasts expire on stale status, offline checks, and past target times", 
   assert.equal(isForecastFresh({...status,predicted_for:new Date(now).toISOString()},now),false)
   assert.equal(isForecastFresh({...status,predicted_level_2h:null},now),false)
 })
+
+test("backend one-sample pump windows retain their estimated volume and duration", () => {
+  const now = Date.parse("2026-09-25T12:00:00Z")
+  const data = buildDailyVolumes([
+    {start:"2026-09-24T10:00:00Z",end:"2026-09-24T10:00:00Z",volume_litres:25,duration_min:1,avg_rate:25},
+    {start:"2026-09-24T11:00:00Z",end:"2026-09-24T11:01:00Z",volume_litres:50,duration_min:2,avg_rate:25},
+  ], "week", now)
+  const populated = data.filter(d => d.volume !== null)
+  assert.equal(populated.length, 1)
+  assert.equal(populated[0].volume, 75)
+  assert.equal(populated[0].runtimeMin, 3)
+})
+
+test("recommendation cannot stay actionable after expiry or a failed refresh", async () => {
+  const {isRecommendationCurrent} = await import("../src/readings/chart-data.ts")
+  const now = Date.parse("2026-09-25T12:00:00Z")
+  const assessment = {assessed_at:new Date(now).toISOString(),valid_until:new Date(now+60_000).toISOString()}
+  assert.equal(isRecommendationCurrent(assessment,now),true)
+  assert.equal(isRecommendationCurrent(assessment,now,true),false)
+  assert.equal(isRecommendationCurrent(assessment,now+60_000),false)
+  assert.equal(isRecommendationCurrent(assessment,now-1),false)
+  assert.equal(isRecommendationCurrent(undefined,now),false)
+})
+
+test("forecast chart bridges use elapsed time and preserve recorded values", async () => {
+  const {prepareForecastChart} = await import("../src/readings/chart-data.ts")
+  const row = (t: string, actual: number | null, predicted: number | null) => ({t,actual,predicted,confidence:null,issued_at:null,model_version:null})
+  const source = [row("2026-09-25T03:00Z",6.9,7),row("2026-09-25T00:00Z",6.6,6.7),row("2026-09-25T01:00Z",null,null)]
+  const original = JSON.stringify(source)
+  const data = prepareForecastChart(source)
+  assert.equal(data.length,4)
+  assert.equal(data[1].forecast_actual,null)
+  assert.equal(data[1].actual,null)
+  assert.equal(data[1].predicted,null)
+  assert.ok(Math.abs(data[1].forecast_interpolated!-6.7)<1e-10)
+  assert.ok(Math.abs(data[2].predicted_interpolated!-6.9)<1e-10)
+  assert.equal(data[1].observation_bridge,true)
+  assert.equal(data[1].prediction_bridge,true)
+  assert.equal(data[0].observation_bridge,false)
+  assert.equal(JSON.stringify(source),original)
+  assert.equal(data.filter(p=>p.actual!==null && p.predicted!==null).length,2)
+})
+
+test("forecast chart never extrapolates missing leading or trailing observations", async () => {
+  const {prepareForecastChart} = await import("../src/readings/chart-data.ts")
+  const data=prepareForecastChart([null,6.8,null].map((actual,i)=>({t:`2026-09-25T0${i}:00Z`,actual,predicted:6.9,confidence:null,issued_at:null,model_version:null})))
+  assert.equal(data[0].forecast_interpolated,null)
+  assert.equal(data[1].forecast_actual,6.8)
+  assert.equal(data[2].forecast_interpolated,null)
+  assert.ok(data.every(p=>!p.observation_bridge))
+})
+
+test("observation and forecast gap bridges are independent", async () => {
+  const {prepareForecastChart} = await import("../src/readings/chart-data.ts")
+  const data=prepareForecastChart([6.7,6.8,6.9].map((actual,i)=>({t:`2026-09-25T0${i}:00Z`,actual,predicted:i===1?null:actual+.1,confidence:null,issued_at:null,model_version:null})))
+  assert.equal(data[1].prediction_bridge,true)
+  assert.equal(data[1].observation_bridge,false)
+  assert.equal(data[1].forecast_actual,6.8)
+  assert.equal(data[1].predicted,null)
+})

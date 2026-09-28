@@ -50,7 +50,7 @@ export function PumpPanel({ boreholeId }: { boreholeId: number }) {
       )}
 
       {!query.isPending && !query.isError && !query.data && (
-        <EmptyBlock text="No pump on this borehole yet. Install one to unlock scheduling and manual control from the dashboard." />
+        <EmptyBlock text="No pump on this borehole yet. Register its installation details to display reported pumping activity." />
       )}
 
       {query.data && (

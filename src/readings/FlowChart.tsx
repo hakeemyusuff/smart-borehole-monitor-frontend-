@@ -215,7 +215,7 @@ function DailyVolumeBarChart({ data }: { data: DailyVolumePoint[] }) {
 
           <Bar
             dataKey="volume"
-            name="Daily abstracted volume"
+            name="Estimated daily abstraction"
             fill={`url(#${gradientId})`}
             fillOpacity={0.9}
             maxBarSize={32}
@@ -264,7 +264,7 @@ function VolumeTooltip({
           </p>
           {point.runtimeMin !== null && (
             <p className="text-[11px] text-muted-foreground [font-variant-numeric:tabular-nums]">
-              Pump ran {formatRuntime(point.runtimeMin)}
+              Estimated runtime {formatRuntime(point.runtimeMin)}
             </p>
           )}
         </>

@@ -1,3 +1,4 @@
+import { RecommendationPanel } from "@/pump/RecommendationPanel"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
@@ -11,7 +12,7 @@ import { FlowChart } from "@/readings/FlowChart"
 import { ForecastPanel } from "@/predictions/ForecastPanel"
 import { RangeSelector } from "@/components/RangeSelector"
 import { rangeDescription, buildDailyVolumes } from "@/readings/chart-data"
-import { usePump, useChangePumpStatus } from "@/pump/queries"
+import { usePump } from "@/pump/queries"
 import { usePumpWindows } from "@/pump/queries"
 import { useWeatherSeries } from "@/weather/queries"
 import { HumidityIcon, RainIcon, TempIcon } from "@/weather/icons"
@@ -21,7 +22,6 @@ import type {
   ChartPoint,
   Location,
   ChartRange,
-  PumpStatus,
   SensorPublic,
   WaterLevelReading,
   Weather,
@@ -36,15 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { toast } from "sonner"
+
 
 export function DashboardPage() {
   const [params, setParams] = useSearchParams()
@@ -276,6 +268,7 @@ function BoreholeGrid({ borehole }: { borehole: Borehole }) {
       <StatusStrip boreholeId={boreholeId} pressureSensor={pressureSensor} sensorsPending={sensorsQuery.isPending} criticalLow={borehole.critical_low_level} optimalHigh={borehole.optimal_high_level} locationId={borehole.location_id ?? undefined}/>
       {sensorsQuery.isError && <p role="alert" className="text-sm text-destructive">Unable to load sensors. <button className="underline" onClick={() => sensorsQuery.refetch()}>Retry</button></p>}
       <ForecastPanel borehole={borehole} sensor={pressureSensor}/>
+      <RecommendationPanel boreholeId={boreholeId}/>
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <h2 className="font-heading text-xl">Measurement history</h2>
@@ -287,7 +280,7 @@ function BoreholeGrid({ borehole }: { borehole: Borehole }) {
         <ChartCard title="Groundwater level" subtitle="Height above the pressure sensor (m)" viewHref={pressureSensor ? `/boreholes/${boreholeId}/sensors/${pressureSensor.id}` : undefined}>
           <WaterLevelOverviewBody boreholeId={boreholeId} sensor={pressureSensor} sensorsPending={sensorsQuery.isPending} criticalLow={borehole.critical_low_level} optimalHigh={borehole.optimal_high_level} range={range}/>
         </ChartCard>
-        <ChartCard title="Recorded flow" subtitle={range === "day" ? "Rate in L/min" : "Daily abstracted volume (L)"} viewHref={flowSensor ? `/boreholes/${boreholeId}/sensors/${flowSensor.id}` : undefined}>
+        <ChartCard title="Recorded flow" subtitle={range === "day" ? "Rate in L/min" : "Estimated daily abstraction (L)"} viewHref={flowSensor ? `/boreholes/${boreholeId}/sensors/${flowSensor.id}` : undefined}>
           <FlowOverviewBody boreholeId={boreholeId} sensor={flowSensor} sensorsPending={sensorsQuery.isPending} range={range}/>
         </ChartCard>
       </div>
@@ -447,129 +440,13 @@ function WaterLevelCell({
 
 function PumpStatusCell({ boreholeId }: { boreholeId: number | undefined }) {
   const query = usePump(boreholeId)
-  const change = useChangePumpStatus(boreholeId!)
-  const [confirmingTo, setConfirmingTo] = useState<PumpStatus | null>(null)
-
-  if (query.isPending) {
-    return (
-      <StatusCell label="Pump status">
-        <Skeleton className="h-5 w-20" />
-        <Skeleton className="h-3 w-36" />
-      </StatusCell>
-    )
-  }
-
-  if (query.isError || !query.data) {
-    return (
-      <StatusCell label="Pump status">
-        <span className="text-sm text-muted-foreground">No pump</span>
-      </StatusCell>
-    )
-  }
-
   const pump = query.data
-  const nextStatus: PumpStatus = pump.status === "on" ? "off" : "on"
-
-  const onConfirm = () => {
-    if (confirmingTo === null) return
-    change.mutate(confirmingTo, {
-      onSuccess: (res) => {
-        toast.success(
-          `Pump ${res.pump.status === "on" ? "turned on" : "turned off"}`,
-        )
-        setConfirmingTo(null)
-      },
-      onError: (err) => {
-        const msg =
-          err instanceof ApiError ? err.message : "Couldn't change pump status"
-        toast.error(msg)
-      },
-    })
-  }
-
-  const since = pump.last_status_change
-    ? relativeTime(pump.last_status_change)
-    : "—"
-
-  return (
-    <>
-      <StatusCell label="Pump status">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={pump.status === "on"}
-            aria-label={
-              pump.status === "on" ? "Turn pump off" : "Turn pump on"
-            }
-            disabled={change.isPending}
-            onClick={() => setConfirmingTo(nextStatus)}
-            className={cn(
-              "relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-              pump.status === "on" ? "bg-primary" : "bg-border",
-            )}
-          >
-            <span
-              className={cn(
-                "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200",
-                pump.status === "on" ? "translate-x-6" : "translate-x-1",
-              )}
-            />
-          </button>
-          <span
-            className={cn(
-              "text-[11px] font-medium",
-              pump.status === "on" ? "text-primary" : "text-muted-foreground",
-            )}
-          >
-            {pump.status === "on" ? "ON" : "OFF"}
-          </span>
-        </div>
-        <span className="text-[10px] text-muted-foreground/60 [font-variant-numeric:tabular-nums]">
-          Since {since} · {pump.power_rating} kW · {pump.depth}m
-        </span>
-      </StatusCell>
-
-      <Dialog
-        open={confirmingTo !== null}
-        onOpenChange={(open) => {
-          if (!open && !change.isPending) setConfirmingTo(null)
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {confirmingTo === "on" ? "Turn pump ON?" : "Turn pump OFF?"}
-            </DialogTitle>
-            <DialogDescription>
-              This sends a command to the physical pump. It will be recorded
-              in the pump history as a manual override.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setConfirmingTo(null)}
-              disabled={change.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant={confirmingTo === "off" ? "outline" : "default"}
-              onClick={onConfirm}
-              disabled={change.isPending}
-            >
-              {change.isPending
-                ? "Sending…"
-                : confirmingTo === "on"
-                  ? "Turn ON"
-                  : "Turn OFF"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
+  return <StatusCell label="Last reported pump state">
+    {query.isPending ? <Skeleton className="h-5 w-20"/> :
+      <span className="text-sm font-medium">{query.isError ? "Status unavailable" : pump ? pump.status.toUpperCase() : "No pump registered"}</span>}
+    <span className="text-[10px] text-muted-foreground">Observation only · no remote switching</span>
+    {pump?.last_status_change && <span className="text-[10px] text-muted-foreground">Last transition {relativeTime(pump.last_status_change)}</span>}
+  </StatusCell>
 }
 
 function PumpRunCell({ boreholeId }: { boreholeId: number | undefined }) {
@@ -867,7 +744,7 @@ function FlowOverviewBody({
         chartQuery.refetch()
         pumpWindowsQuery.refetch()
       }}
-      data={volumeMode ? chartQuery.data ?? [{ t: new Date().toISOString(), value: null }] : chartQuery.data}
+      data={volumeMode ? [{ t: new Date().toISOString(), value: null }] : chartQuery.data}
       missingSensorText="No flow meter on this borehole."
       emptyText="No flow readings in this window."
       render={(points) => <FlowChart points={points} range={range} dailyVolumes={dailyVolumes} />}

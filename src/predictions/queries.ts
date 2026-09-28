@@ -41,3 +41,12 @@ export function usePredictionStatus(boreholeId: number | undefined) {
     ...liveQueryOptions,
   })
 }
+
+export function usePumpRecommendation(boreholeId: number | undefined) {
+  return useQuery({
+    queryKey: ["predictions", "recommendation", boreholeId],
+    queryFn: () => api.get<import("@/lib/types").PumpRecommendation>(`/api/predictions/${boreholeId}/recommendation`),
+    enabled: boreholeId !== undefined,
+    ...liveQueryOptions,
+  })
+}

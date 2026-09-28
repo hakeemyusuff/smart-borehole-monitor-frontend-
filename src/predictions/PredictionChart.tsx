@@ -12,15 +12,9 @@ import {
 } from "recharts"
 import type { ChartRange, PredictionChartPoint } from "@/lib/types"
 import { useIsNarrow } from "@/lib/useIsNarrow"
-import { chartTick, formatWat } from "@/readings/chart-data"
+import { chartTick, formatWat, prepareForecastChart } from "@/readings/chart-data"
 
-type Point = {
-  t: number
-  predicted: number | null
-  actual: number | null
-  issued_at: string | null
-  model_version: string | null
-}
+type Point = ReturnType<typeof prepareForecastChart>[number]
 
 // Forecast (violet, dashed) vs observed (teal, solid). Forecast/observed
 // magnitudes differ by centimetres, so colour + dash pattern carry the
@@ -41,20 +35,7 @@ export function PredictionChart({
 }) {
   const narrow = useIsNarrow()
 
-  const data = useMemo<Point[]>(
-    () =>
-      points
-        .map((p) => ({
-          t: Date.parse(p.t),
-          predicted: p.predicted,
-          actual: p.actual,
-          issued_at: p.issued_at,
-          model_version: p.model_version,
-        }))
-        .filter((p) => Number.isFinite(p.t))
-        .sort((a, b) => a.t - b.t),
-    [points],
-  )
+  const data = useMemo(() => prepareForecastChart(points), [points])
 
   const values = useMemo(
     () =>
@@ -66,13 +47,13 @@ export function PredictionChart({
     [data],
   )
 
-  // Tight data-driven domain (±0.3 m): forecast and observed differ by only
+  // Tight data-driven domain (±0.2 m): forecast and observed differ by only
   // a few centimetres, so a full-scale axis (0–7 m) renders the two lines on
   // top of each other. Reference-line thresholds can sit outside this window
   // — they are horizontal rails, and clipping them is fine.
   const yDomain = useMemo<[string, string]>(() => {
     if (values.length === 0) return ["0", "1"]
-    return ["dataMin - 0.3", "dataMax + 0.3"]
+    return ["dataMin - 0.2", "dataMax + 0.2"]
   }, [values])
 
   if (!data.length || !values.length) return null
@@ -96,7 +77,7 @@ export function PredictionChart({
           />
           <YAxis
             domain={yDomain}
-            tickFormatter={(v: number) => v.toFixed(1)}
+            tickFormatter={(v: number) => v.toFixed(2)}
             tick={{ fill: "var(--muted-foreground)", fontSize: tickFontSize }}
             stroke="var(--border)"
             tickLine={{ stroke: "var(--border)" }}
@@ -132,6 +113,9 @@ export function PredictionChart({
               }}
             />
           )}
+          {/* Grey underlays bridge missing intervals; recorded series cover valid segments. */}
+          <Line type="linear" dataKey="forecast_interpolated" name="Observed gap bridge" stroke="#64748b" strokeDasharray="3 3" strokeWidth={1.5} dot={false} activeDot={false} connectNulls={true} isAnimationActive={false}/>
+          <Line type="linear" dataKey="predicted_interpolated" name="Forecast gap bridge" stroke="#64748b" strokeDasharray="3 3" strokeWidth={1.5} dot={false} activeDot={false} connectNulls={true} isAnimationActive={false}/>
           <Line
             type="linear"
             dataKey="predicted"
@@ -139,7 +123,7 @@ export function PredictionChart({
             stroke={FORECAST_COLOR}
             strokeDasharray="4 4"
             strokeWidth={2}
-            connectNulls
+            connectNulls={false}
             isAnimationActive={false}
             dot={(props) => {
               // Small markers on every populated forecast point so paired
@@ -161,11 +145,11 @@ export function PredictionChart({
           />
           <Line
             type="linear"
-            dataKey="actual"
+            dataKey="forecast_actual"
             name="Observed"
             stroke={OBSERVED_COLOR}
             strokeWidth={2}
-            connectNulls
+            connectNulls={false}
             isAnimationActive={false}
             dot={(props) => {
               if (props.value == null || props.cx == null || props.cy == null) return null
@@ -187,6 +171,20 @@ export function PredictionChart({
             content={({ active, payload }) => {
               if (!active || !payload?.length) return null
               const point = payload[0].payload as Point
+              if (point.observation_bridge || point.prediction_bridge) {
+                return (
+                  <div className="rounded-xl border border-border bg-popover p-3 shadow-xl text-xs space-y-2">
+                    <p className="text-muted-foreground">{formatWat(point.t)}</p>
+                    {point.observation_bridge && (
+                      <p>{point.prediction_bridge ? "Observed: " : ""}{point.forecast_interpolated!.toFixed(2)} m</p>
+                    )}
+                    {point.prediction_bridge && (
+                      <p>{point.observation_bridge ? "Forecast: " : ""}{point.predicted_interpolated!.toFixed(2)} m</p>
+                    )}
+                    <span className="inline-flex rounded-full border border-slate-500/40 bg-slate-500/15 px-2 py-1 text-[10px] text-muted-foreground">Estimated gap bridge</span>
+                  </div>
+                )
+              }
               return (
                 <div className="rounded-xl border border-border bg-popover p-3 shadow-xl text-xs space-y-2 min-w-44">
                   <p className="text-muted-foreground">Target · {formatWat(point.t)}</p>

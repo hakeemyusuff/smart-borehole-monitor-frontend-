@@ -260,7 +260,7 @@ function FlowPanel({
     range === "day"
       ? chartQuery
       : {
-          isPending: chartQuery.isPending || pumpWindowsQuery.isPending,
+          isPending: pumpWindowsQuery.isPending,
           // A rate-endpoint failure must not block the volume chart — the
           // volume series comes from pump windows, not the rate samples.
           isError: false,
@@ -284,7 +284,7 @@ function FlowPanel({
             <p className="text-xs text-muted-foreground">
               {range === "day"
                 ? `${rangeDescription[range]}. Missing records do not prove the pump was off.`
-                : "Total abstracted volume per calendar day, aggregated from pump-run windows."}
+                : "Estimated abstraction per calendar day. Pump-window totals are allocated by estimated duration; missing records do not prove zero pumping."}
             </p>
           </div>
           {latest !== null && <LatestReadout value={latest} unit="L/min" label={range === "day" ? "Latest in window" : "Latest bucket average"} />}

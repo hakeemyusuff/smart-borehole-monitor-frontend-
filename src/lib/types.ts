@@ -209,3 +209,27 @@ export type RainChartPoint = {
   t: string
   precipitation: number
 }
+
+export type PumpRecommendation = {
+  status: "unavailable" | "defer" | "reassess" | "consider"
+  reason_code: string
+  reason: string
+  assessed_at: string
+  valid_until: string
+  next_review_at: string
+  suggested_start_at: string | null
+  current_level_m: number | null
+  current_level_captured_at: string | null
+  forecast_level_m: number | null
+  forecast_target_at: string | null
+  model_version: string | null
+  rules_version: string
+  advisory_only: boolean
+  limitation: string
+  policy: {
+    sensor_id: number
+    minimum_level_m: number
+    consideration_level_m: number
+    basis: string
+  } | null
+}
