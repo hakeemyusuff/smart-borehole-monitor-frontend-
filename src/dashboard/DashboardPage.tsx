@@ -521,10 +521,8 @@ function WeatherCell({
 
   return (
     <StatusCell label="Weather">
-      {/* Grid keeps the three stats aligned + legible on narrow widths
-          (was flex-wrap with a 13px readout, which pushed the third stat
-          to a second row and looked cramped on mobile). */}
-      <div className="grid grid-cols-3 gap-2">
+      {/* Wrap whole readings instead of truncating numbers in a narrow card. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(5rem,1fr))] gap-x-3 gap-y-2">
         <WeatherStat
           icon={<TempIcon size={12} />}
           label="Temp"
@@ -570,7 +568,7 @@ function WeatherStat({
         </span>
         {label}
       </span>
-      <span className="text-base font-medium [font-variant-numeric:tabular-nums] truncate">
+      <span className="text-base font-medium [font-variant-numeric:tabular-nums] whitespace-nowrap">
         {value}
         <span className="text-muted-foreground text-[11px] ml-0.5">{unit}</span>
       </span>

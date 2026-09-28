@@ -172,14 +172,14 @@ test("forecast chart bridges use elapsed time and preserve recorded values", asy
   const source = [row("2026-09-25T03:00Z",6.9,7),row("2026-09-25T00:00Z",6.6,6.7),row("2026-09-25T01:00Z",null,null)]
   const original = JSON.stringify(source)
   const data = prepareForecastChart(source)
-  assert.equal(data.length,4)
-  assert.equal(data[1].forecast_actual,null)
-  assert.equal(data[1].actual,null)
-  assert.equal(data[1].predicted,null)
-  assert.ok(Math.abs(data[1].forecast_interpolated!-6.7)<1e-10)
-  assert.ok(Math.abs(data[2].predicted_interpolated!-6.9)<1e-10)
-  assert.equal(data[1].observation_bridge,true)
-  assert.equal(data[1].prediction_bridge,true)
+  assert.equal(data.length,7)
+  assert.equal(data[2].forecast_actual,null)
+  assert.equal(data[2].actual,null)
+  assert.equal(data[2].predicted,null)
+  assert.ok(Math.abs(data[2].forecast_interpolated!-6.7)<1e-10)
+  assert.ok(Math.abs(data[4].predicted_interpolated!-6.9)<1e-10)
+  assert.equal(data[2].observation_bridge,true)
+  assert.equal(data[2].prediction_bridge,true)
   assert.equal(data[0].observation_bridge,false)
   assert.equal(JSON.stringify(source),original)
   assert.equal(data.filter(p=>p.actual!==null && p.predicted!==null).length,2)
@@ -189,16 +189,56 @@ test("forecast chart never extrapolates missing leading or trailing observations
   const {prepareForecastChart} = await import("../src/readings/chart-data.ts")
   const data=prepareForecastChart([null,6.8,null].map((actual,i)=>({t:`2026-09-25T0${i}:00Z`,actual,predicted:6.9,confidence:null,issued_at:null,model_version:null})))
   assert.equal(data[0].forecast_interpolated,null)
-  assert.equal(data[1].forecast_actual,6.8)
-  assert.equal(data[2].forecast_interpolated,null)
+  assert.equal(data[2].forecast_actual,6.8)
+  assert.equal(data[4].forecast_interpolated,null)
   assert.ok(data.every(p=>!p.observation_bridge))
 })
 
 test("observation and forecast gap bridges are independent", async () => {
   const {prepareForecastChart} = await import("../src/readings/chart-data.ts")
   const data=prepareForecastChart([6.7,6.8,6.9].map((actual,i)=>({t:`2026-09-25T0${i}:00Z`,actual,predicted:i===1?null:actual+.1,confidence:null,issued_at:null,model_version:null})))
-  assert.equal(data[1].prediction_bridge,true)
-  assert.equal(data[1].observation_bridge,false)
-  assert.equal(data[1].forecast_actual,6.8)
-  assert.equal(data[1].predicted,null)
+  assert.equal(data[2].prediction_bridge,true)
+  assert.equal(data[2].observation_bridge,false)
+  assert.equal(data[2].forecast_actual,6.8)
+  assert.equal(data[2].predicted,null)
+})
+
+
+test("forecast comparison selects the nearest real prediction issued before the reading", async () => {
+  const {closestForecastForReading} = await import("../src/readings/chart-data.ts")
+  const now = Date.parse("2026-09-28T12:35Z")
+  const row = (target: string, issued = "2026-09-28T10:05Z", version = "model") => ({
+    t: target, predicted: 6.8, actual: null, confidence: null, issued_at: issued, model_version: version,
+  })
+  const old = row("2026-09-28T12:00Z")
+  const near = row("2026-09-28T12:30Z", "2026-09-28T10:35Z")
+  const upcoming = row("2026-09-28T14:30Z", "2026-09-28T12:35Z")
+  const source = [upcoming, near, old]
+  const original = JSON.stringify(source)
+  assert.equal(closestForecastForReading(source, "2026-09-28T12:29Z", now, "model"), near)
+  assert.equal(closestForecastForReading(source, "2026-09-28T12:28Z", Date.parse("2026-09-28T12:29Z"), "model"), near)
+  assert.equal(JSON.stringify(source), original)
+  assert.equal(closestForecastForReading(source, "2026-09-28T12:15Z", now, "model"), old)
+  for (const invalid of [
+    row("2026-09-28T11:00Z"), upcoming,
+    row("2026-09-28T12:30Z", "2026-09-28T12:30Z"),
+    row("2026-09-28T12:30Z", "2026-09-28T10:35Z", "old-model"),
+    {...near, predicted: null}, {...near, issued_at: null}, {...near, predicted: NaN},
+  ]) {
+    assert.equal(closestForecastForReading([invalid], "2026-09-28T12:29Z", now, "model"), null)
+  }
+  assert.equal(closestForecastForReading(source, null, now, "model"), null)
+  assert.equal(closestForecastForReading(source, "2026-09-28T12:40Z", now, "model"), null)
+})
+
+test("half-hour chart gaps retain recorded targets and only interpolate display values", async () => {
+  const {prepareForecastChart} = await import("../src/readings/chart-data.ts")
+  const source = [0, 60].map(minutes => ({t: new Date(Date.parse("2026-09-28T12:00Z") + minutes*60_000).toISOString(),
+    predicted: 6 + minutes/60, actual: 6 + minutes/60, confidence: null, issued_at: null, model_version: null}))
+  const data = prepareForecastChart(source)
+  assert.equal(data.length, 3)
+  assert.equal(data[1].t, Date.parse("2026-09-28T12:30Z"))
+  assert.equal(data[1].predicted, null)
+  assert.equal(data[1].actual, null)
+  assert.equal(data[1].predicted_interpolated, 6.5)
 })

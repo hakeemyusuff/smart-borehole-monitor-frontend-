@@ -175,17 +175,40 @@ export function isRecommendationCurrent(
     && Date.parse(recommendation.valid_until) > now
 }
 
+/** Compare a real reading with a forecast saved before that reading existed. */
+export function closestForecastForReading(
+  points: import("../lib/types").PredictionChartPoint[],
+  capturedAt: string | null,
+  now: number,
+  modelVersion: string | null,
+) {
+  const captured = capturedAt ? Date.parse(capturedAt) : NaN
+  if (!Number.isFinite(captured) || captured > now || !modelVersion) return null
+  const candidates = points.filter(point => {
+    const target = Date.parse(point.t)
+    const issued = point.issued_at ? Date.parse(point.issued_at) : NaN
+    return point.model_version === modelVersion && point.predicted !== null
+      && Number.isFinite(point.predicted) && point.predicted >= 0
+      && Number.isFinite(target) && Math.abs(target - captured) <= 35 * 60_000
+      && Number.isFinite(issued) && issued < captured && issued < target
+  })
+  candidates.sort((a, b) => Math.abs(Date.parse(a.t) - captured) - Math.abs(Date.parse(b.t) - captured)
+    || Date.parse(a.t) - Date.parse(b.t))
+  return candidates[0] ?? null
+}
+
 /** Display-only bridges. Original observations/forecasts remain unchanged. */
 export function prepareForecastChart(points: import("../lib/types").PredictionChartPoint[]) {
   const valid = (value: number | null) => value !== null && Number.isFinite(value) ? value : null
   const sorted = points.map(p => ({ ...p, t: Date.parse(p.t) }))
     .filter(p => Number.isFinite(p.t)).sort((a, b) => a.t - b.t)
-  // The API normally supplies null hourly buckets; also handle omitted buckets.
+  // Preserve half-hour targets and show missing half-hour buckets explicitly.
+  const interval = HOUR / 2
   const expanded: typeof sorted = []
   for (const p of sorted) {
     const previous = expanded.at(-1)
-    if (previous && p.t - previous.t > HOUR) {
-      for (let t = previous.t + HOUR; t < p.t; t += HOUR) {
+    if (previous && p.t - previous.t > interval) {
+      for (let t = previous.t + interval; t < p.t; t += interval) {
         expanded.push({ t, predicted: null, actual: null, confidence: null, issued_at: null, model_version: null })
       }
     }

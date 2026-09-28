@@ -24,7 +24,7 @@ export function WeatherStrip({ locationId }: { locationId: number | undefined })
   return (
     <Card className="w-full">
       <CardHeader>
-        <div className="w-full flex items-start justify-between gap-3">
+        <div className="w-full flex flex-wrap items-start justify-between gap-3">
           <CardTitle className="font-heading text-xl">Weather</CardTitle>
           {latest && (
             <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 [font-variant-numeric:tabular-nums]">
@@ -72,10 +72,7 @@ function WeatherBody({
     )
   }
   return (
-    // 3-col grid so the stats stay aligned + readable on narrow widths;
-    // was flex-wrap with a sub-14px readout that broke to two rows and
-    // looked cramped on mobile.
-    <div className="grid grid-cols-3 gap-3 md:gap-6">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-3 md:gap-6">
       <Stat
         icon={<TempIcon />}
         label="Temp"
@@ -118,7 +115,7 @@ function Stat({
         <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           {label}
         </span>
-        <span className="text-base font-medium text-foreground [font-variant-numeric:tabular-nums] truncate">
+        <span className="text-base font-medium text-foreground [font-variant-numeric:tabular-nums] whitespace-nowrap">
           {value}
           <span className="text-muted-foreground text-xs ml-0.5">{unit}</span>
         </span>

@@ -9,7 +9,7 @@ import { RangeSelector } from "@/components/RangeSelector"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { formatWat, isForecastFresh, downloadCsv } from "@/readings/chart-data"
+import { formatWat, closestForecastForReading, downloadCsv } from "@/readings/chart-data"
 import { cn } from "@/lib/utils"
 import type { Borehole, ChartRange, SensorPublic } from "@/lib/types"
 
@@ -24,18 +24,22 @@ export function ForecastPanel({ borehole, sensor }: { borehole: Borehole; sensor
   const latest = latestQuery.data?.items[0]
   const level = latest?.water_level ?? status?.current_level ?? null
   const captured = latest?.captured_at ?? status?.current_level_captured_at ?? null
-  const measuredStale = !captured || now - Date.parse(captured) > 35 * 60_000 || latestQuery.isError
-  const fresh = isForecastFresh(status, now, statusQuery.isError)
-  const predicted = fresh ? status!.predicted_level_2h : null
+  const captureTime = captured ? Date.parse(captured) : NaN
+  const measuredStale = !Number.isFinite(captureTime) || captureTime > now || now - captureTime > 35 * 60_000 || latestQuery.isError
   const points = chartQuery.data ?? []
+  const historyCurrent = !chartQuery.isError && chartQuery.dataUpdatedAt > 0 && now - chartQuery.dataUpdatedAt < 120_000
+  const matched = historyCurrent && !measuredStale
+    ? closestForecastForReading(points, captured, now, status?.model_version ?? null)
+    : null
+  const predicted = matched?.predicted ?? null
   const pairs = points.filter(p => p.predicted !== null && p.actual !== null)
   const mae = pairs.length ? pairs.reduce((sum,p) => sum + Math.abs(p.predicted! - p.actual!), 0) / pairs.length * 100 : null
   const scale = Math.max(borehole.total_depth || 0, Math.ceil(level ?? 0), Math.ceil(predicted ?? 0), 1)
-  const forecastMessage = statusQuery.isError ? "Forecast service unreachable."
-    : statusQuery.isPending ? "Checking forecast…"
-    : !status ? "No forecast status."
-    : status.status === "fresh" && !fresh ? "Forecast expired — waiting for an update."
-    : status.message
+  const forecastMessage = chartQuery.isError ? "Forecast history unreachable."
+    : chartQuery.isPending || statusQuery.isPending ? "Checking forecast history…"
+    : measuredStale ? "Waiting for a recent sensor reading."
+    : !historyCurrent ? "Refreshing forecast history…"
+    : "No saved forecast matches this reading yet."
   const exportHistory = () => downloadCsv(`forecast-${borehole.id}-${range}.csv`,
     ["target_time_utc", "issued_at_utc", "predicted_level_m", "actual_level_m", "model_version"],
     points.map(p => [p.t, p.issued_at, p.predicted, p.actual, p.model_version]))
@@ -73,8 +77,8 @@ export function ForecastPanel({ borehole, sensor }: { borehole: Borehole; sensor
             <div className="flex flex-col justify-between h-full p-4 min-w-0 text-center rounded-xl border border-[#c084fc]/25 bg-[#c084fc]/5" data-testid="forecast-column" aria-live="polite">
               <div>
                 <div className="flex items-center justify-center gap-1.5">
-                  <p className="text-xs font-medium text-[#c084fc]">Forecast</p>
-                  <InfoTooltip title="2-hour forecast" note="Model-estimated level two hours ahead, on the same scale as the measured column. Updates hourly; expires if updates stop." />
+                  <p className="text-xs font-medium text-[#c084fc]">Forecast for reading</p>
+                  <InfoTooltip title="Forecast for this reading" note="The saved two-hour forecast with a target closest to the latest measurement (within 35 minutes), issued before that measurement. New forecasts are generated every 30 minutes." />
                 </div>
                 <p className="text-2xl md:text-3xl tabular-nums mt-3">{predicted !== null ? predicted.toFixed(3) : "—"}<span className="text-sm text-muted-foreground ml-1">m</span></p>
               </div>
@@ -87,10 +91,10 @@ export function ForecastPanel({ borehole, sensor }: { borehole: Borehole; sensor
               </div>
               <div className="min-h-12">
                 <Badge variant="outline" className={predicted !== null ? "border-[#c084fc]/40 text-[#c084fc]" : "border-warning/40 text-warning"}>
-                  {statusQuery.isError ? "Connection issue" : statusQuery.isPending ? "Checking" : predicted !== null ? "Current forecast" : status?.status === "stale" || status?.status === "fresh" ? "Outdated forecast" : "Unavailable"}
+                  {chartQuery.isError ? "Connection issue" : chartQuery.isPending || statusQuery.isPending ? "Checking" : predicted !== null ? "Matched forecast" : "Awaiting match"}
                 </Badge>
                 <p className="text-[11px] text-muted-foreground mt-1.5">
-                  {status?.predicted_for ? `For ${formatWat(status.predicted_for)}` : "Awaiting forecast"}
+                  {matched ? `For ${formatWat(matched.t)}` : "Awaiting forecast"}
                 </p>
               </div>
             </div>
@@ -143,7 +147,7 @@ export function ForecastPanel({ borehole, sensor }: { borehole: Borehole; sensor
                   </div>
                   <div>
                     <dt>Update Cadence</dt>
-                    <dd className="mt-1 font-medium text-foreground">Hourly (H+05)</dd>
+                    <dd className="mt-1 font-medium text-foreground">Every 30 min (:05 / :35)</dd>
                   </div>
                 </dl>
                 <div className="flex justify-end pt-3">
