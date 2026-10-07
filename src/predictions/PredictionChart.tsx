@@ -2,7 +2,6 @@ import { useMemo } from "react"
 import {
   CartesianGrid,
   ComposedChart,
-  Dot,
   Line,
   ReferenceLine,
   ResponsiveContainer,
@@ -35,7 +34,7 @@ export function PredictionChart({
 }) {
   const narrow = useIsNarrow()
 
-  const data = useMemo(() => prepareForecastChart(points), [points])
+  const data = useMemo(() => prepareForecastChart(points, range), [points, range])
 
   const values = useMemo(
     () =>
@@ -113,59 +112,26 @@ export function PredictionChart({
               }}
             />
           )}
-          {/* Grey underlays bridge missing intervals; recorded series cover valid segments. */}
-          <Line type="linear" dataKey="forecast_interpolated" name="Observed gap bridge" stroke="#64748b" strokeDasharray="3 3" strokeWidth={1.5} dot={false} activeDot={false} connectNulls={true} isAnimationActive={false}/>
-          <Line type="linear" dataKey="predicted_interpolated" name="Forecast gap bridge" stroke="#64748b" strokeDasharray="3 3" strokeWidth={1.5} dot={false} activeDot={false} connectNulls={true} isAnimationActive={false}/>
-          <Line
-            type="linear"
-            dataKey="predicted"
-            name="Forecast"
-            stroke={FORECAST_COLOR}
-            strokeDasharray="4 4"
-            strokeWidth={2}
-            connectNulls={false}
-            isAnimationActive={false}
-            dot={(props) => {
-              // Small markers on every populated forecast point so paired
-              // observations stay legible when the lines nearly coincide;
-              // gap buckets (value null) get no dot.
-              if (props.value == null || props.cx == null || props.cy == null) return null
-              return (
-                <Dot
-                  cx={props.cx}
-                  cy={props.cy}
-                  r={3}
-                  fill={FORECAST_COLOR}
-                  stroke="var(--background)"
-                  strokeWidth={1}
-                />
-              )
-            }}
-            activeDot={{ r: 6 }}
-          />
-          <Line
-            type="linear"
-            dataKey="forecast_actual"
-            name="Observed"
-            stroke={OBSERVED_COLOR}
-            strokeWidth={2}
-            connectNulls={false}
-            isAnimationActive={false}
-            dot={(props) => {
-              if (props.value == null || props.cx == null || props.cy == null) return null
-              return (
-                <Dot
-                  cx={props.cx}
-                  cy={props.cy}
-                  r={3}
-                  fill={OBSERVED_COLOR}
-                  stroke="var(--background)"
-                  strokeWidth={1}
-                />
-              )
-            }}
-            activeDot={{ r: 5 }}
-          />
+          {/* Separate paths stop long outages connecting even between adjacent daily buckets. */}
+          {(["observed_segment", "predicted_segment"] as const).flatMap(segmentKey => {
+            const observed = segmentKey === "observed_segment"
+            const primary = observed ? "forecast_actual" : "predicted"
+            const bridge = observed ? "forecast_interpolated" : "predicted_interpolated"
+            const color = observed ? OBSERVED_COLOR : FORECAST_COLOR
+            return [...new Set(data.filter(p => p[bridge] !== null).map(p => p[segmentKey]))].flatMap(segment => [
+              <Line key={`${segmentKey}-${segment}-bridge`} type="monotone"
+                dataKey={(p: Point) => p[segmentKey] === segment ? p[bridge] : null}
+                name={observed ? "Observed gap bridge" : "Forecast gap bridge"}
+                stroke="#64748b" strokeDasharray="3 3" strokeWidth={1.5} dot={false}
+                activeDot={false} connectNulls={false} isAnimationActive={false}/>,
+              <Line key={`${segmentKey}-${segment}-actual`} type="monotone"
+                dataKey={(p: Point) => p[segmentKey] === segment ? p[primary] : null}
+                name={observed ? "Observed" : "Forecast"} stroke={color}
+                strokeDasharray={observed ? undefined : "4 4"} strokeWidth={2}
+                dot={range === "day" ? { r: 2.5 } : false}
+                activeDot={{ r: 4, strokeWidth: 2 }} connectNulls={false} isAnimationActive={false}/>,
+            ])
+          })}
           <Tooltip
             cursor={{ stroke: "var(--border)", strokeDasharray: "3 3" }}
             content={({ active, payload }) => {
@@ -187,22 +153,22 @@ export function PredictionChart({
               }
               return (
                 <div className="rounded-xl border border-border bg-popover p-3 shadow-xl text-xs space-y-2 min-w-44">
-                  <p className="text-muted-foreground">Target · {formatWat(point.t)}</p>
+                  <p className="text-muted-foreground">{range === "day" ? "Target" : range === "week" ? "6-hour average from" : "Daily average from"} · {formatWat(point.t)}</p>
                   <p style={{ color: FORECAST_COLOR }}>
                     Forecast: {point.predicted === null ? "—" : `${point.predicted.toFixed(3)} m`}
                   </p>
                   <p style={{ color: OBSERVED_COLOR }}>
                     Observed: {point.actual === null ? "Not yet matched" : `${point.actual.toFixed(3)} m`}
                   </p>
-                  {point.predicted !== null && point.actual !== null && (
+                  {range === "day" && point.predicted !== null && point.actual !== null && (
                     <p>Absolute error: {(Math.abs(point.predicted - point.actual) * 100).toFixed(2)} cm</p>
                   )}
-                  <p className="text-muted-foreground border-t border-border pt-2">
+                  {range === "day" && point.issued_at && <p className="text-muted-foreground border-t border-border pt-2">
                     Issued · {formatWat(point.issued_at)}
-                  </p>
-                  {point.model_version && (
-                    <p className="text-muted-foreground/70 break-all">{point.model_version}</p>
-                  )}
+                  </p>}
+                  {range !== "day" && <p className="text-muted-foreground">
+                    {point.observed_count} observations · {point.predicted_count} forecasts
+                  </p>}
                 </div>
               )
             }}

@@ -197,46 +197,78 @@ export function closestForecastForReading(
   return candidates[0] ?? null
 }
 
-/** Display-only bridges. Original observations/forecasts remain unchanged. */
-export function prepareForecastChart(points: import("../lib/types").PredictionChartPoint[]) {
+/** Display-only averages/bridges. Raw points remain the source for MAE and CSV. */
+export function prepareForecastChart(
+  points: import("../lib/types").PredictionChartPoint[],
+  range: ChartRange = "day",
+) {
   const valid = (value: number | null) => value !== null && Number.isFinite(value) ? value : null
-  const sorted = points.map(p => ({ ...p, t: Date.parse(p.t) }))
+  const sorted = points.map(p => ({ ...p, t: Date.parse(p.t), actual: valid(p.actual), predicted: valid(p.predicted) }))
     .filter(p => Number.isFinite(p.t)).sort((a, b) => a.t - b.t)
-  // Preserve half-hour targets and show missing half-hour buckets explicitly.
-  const interval = HOUR / 2
-  const expanded: typeof sorted = []
-  for (const p of sorted) {
-    const previous = expanded.at(-1)
-    if (previous && p.t - previous.t > interval) {
-      for (let t = previous.t + interval; t < p.t; t += interval) {
-        expanded.push({ t, predicted: null, actual: null, confidence: null, issued_at: null, model_version: null })
-      }
-    }
-    expanded.push(p)
+  const interval = range === "month" ? DAY_MS : range === "week" ? 6 * HOUR : HOUR / 2
+  const maxGap = 12 * HOUR
+  const bucketAt = (t: number) => range === "day" ? t
+    : Math.floor((t + WAT_OFFSET_MS) / interval) * interval - WAT_OFFSET_MS
+  const groups = new Map<number, typeof sorted>()
+  for (const point of sorted) {
+    const t = bucketAt(point.t)
+    const group = groups.get(t) ?? []
+    group.push(point)
+    groups.set(t, group)
   }
-  const data = expanded.map(p => ({
-    ...p, predicted: valid(p.predicted), actual: valid(p.actual),
-    forecast_actual: valid(p.actual), // Recorded observations, not interpolated measurements.
-    forecast_interpolated: valid(p.actual),
-    predicted_interpolated: valid(p.predicted),
-    observation_bridge: false, prediction_bridge: false,
-  }))
-  for (const [source, destination, flag] of [
-    ["actual", "forecast_interpolated", "observation_bridge"],
-    ["predicted", "predicted_interpolated", "prediction_bridge"],
+  const mean = (rows: typeof sorted, key: "actual" | "predicted") => {
+    const samples = rows.filter(row => row[key] !== null)
+    // A daily average spanning a long outage would conceal missing coverage.
+    const interrupted = samples.some((row, i) => i > 0 && row.t - samples[i - 1].t >= maxGap)
+    return {
+      value: samples.length && !interrupted ? samples.reduce((sum, row) => sum + row[key]!, 0) / samples.length : null,
+      count: samples.length, first: samples[0]?.t ?? null, last: samples.at(-1)?.t ?? null,
+    }
+  }
+  const data: Array<{
+    t: number; actual: number | null; predicted: number | null; forecast_actual: number | null;
+    forecast_interpolated: number | null; predicted_interpolated: number | null;
+    observation_bridge: boolean; prediction_bridge: boolean; observed_segment: number; predicted_segment: number;
+    observed_count: number; predicted_count: number; actual_first: number | null; actual_last: number | null;
+    predicted_first: number | null; predicted_last: number | null; issued_at: string | null; model_version: string | null;
+  }> = []
+  if (!sorted.length) return data
+  const times = new Set(groups.keys())
+  for (let t = bucketAt(sorted[0].t); t <= bucketAt(sorted.at(-1)!.t); t += interval) times.add(t)
+  for (const t of [...times].sort((a, b) => a - b)) {
+    const rows = groups.get(t) ?? []
+    const actual = mean(rows, "actual"), predicted = mean(rows, "predicted")
+    data.push({
+      t, actual: actual.value, predicted: predicted.value, forecast_actual: actual.value,
+      forecast_interpolated: actual.value, predicted_interpolated: predicted.value,
+      observation_bridge: false, prediction_bridge: false, observed_segment: 0, predicted_segment: 0,
+      observed_count: actual.count, predicted_count: predicted.count,
+      actual_first: actual.first, actual_last: actual.last, predicted_first: predicted.first, predicted_last: predicted.last,
+      issued_at: range === "day" ? rows[0]?.issued_at ?? null : null,
+      model_version: range === "day" ? rows[0]?.model_version ?? null : null,
+    })
+  }
+  for (const [source, destination, flag, segmentKey] of [
+    ["actual", "forecast_interpolated", "observation_bridge", "observed_segment"],
+    ["predicted", "predicted_interpolated", "prediction_bridge", "predicted_segment"],
   ] as const) {
-    let left = -1
+    let left = -1, segment = 0
     data.forEach((point, right) => {
       if (point[source] === null) return
-      if (left >= 0 && right > left + 1) {
+      if (left >= 0) {
         const start = data[left]
-        const duration = point.t - start.t
-        for (let i = left + 1; i < right; i++) {
-          const fraction = (data[i].t - start.t) / duration
-          data[i][destination] = start[source]! + fraction * (point[source]! - start[source]!)
-          data[i][flag] = true
+        const rawGap = point[`${source}_first`]! - start[`${source}_last`]!
+        if (rawGap >= maxGap) segment++
+        else if (right > left + 1) {
+          for (let i = left + 1; i < right; i++) {
+            const fraction = (data[i].t - start.t) / (point.t - start.t)
+            data[i][destination] = start[source]! + fraction * (point[source]! - start[source]!)
+            data[i][flag] = true
+            data[i][segmentKey] = segment
+          }
         }
       }
+      point[segmentKey] = segment
       left = right
     })
   }

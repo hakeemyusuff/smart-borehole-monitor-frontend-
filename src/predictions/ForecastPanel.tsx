@@ -104,10 +104,11 @@ export function ForecastPanel({ borehole, sensor }: { borehole: Borehole; sensor
         <div className="p-4 md:p-5 min-w-0">
           <div className="flex flex-wrap justify-between items-start gap-3">
             <div className="flex items-center gap-1.5">
-              <h3 className="font-heading text-lg">Forecast history</h3>                <InfoTooltip title="Forecast history" note="Forecast target times (violet, dashed) against observed levels (teal, solid, with point markers). Grey dashed bridges mark interpolated gaps; the Y axis zooms to the data." />
+              <h3 className="font-heading text-lg">Forecast history</h3>                <InfoTooltip title="Forecast history" note="Forecasts (violet) against observed levels (teal). Week shows six-hour averages; Month shows daily averages. Grey bridges span gaps shorter than 12 hours. MAE uses original pairs." />
             </div>
             <RangeSelector value={range} onChange={setRange}/>
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">{range === "day" ? "Individual readings" : range === "week" ? "6-hour averages · WAT" : "Daily averages · WAT"}</p>
           <div className="flex flex-wrap gap-4 mt-3 text-[11px] text-muted-foreground" aria-label="Chart legend">
             <span className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-[#2dd4bf]"/>Observed</span>
             <span className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed border-[#c084fc]"/>Forecast</span>

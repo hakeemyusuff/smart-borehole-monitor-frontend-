@@ -242,3 +242,42 @@ test("half-hour chart gaps retain recorded targets and only interpolate display 
   assert.equal(data[1].actual, null)
   assert.equal(data[1].predicted_interpolated, 6.5)
 })
+
+test("long-horizon averages use WAT buckets and leave source records unchanged", async () => {
+  const {prepareForecastChart} = await import("../src/readings/chart-data.ts")
+  const source = [0, 1, 6].map(hour => ({t: new Date(Date.parse("2026-09-24T23:00Z") + hour*3_600_000).toISOString(), actual: 6+hour, predicted: 7+hour, confidence:null, issued_at:null, model_version:null}))
+  const original = JSON.stringify(source)
+  const week = prepareForecastChart(source, "week")
+  assert.equal(week.length, 2)
+  assert.equal(week[0].t, Date.parse("2026-09-24T23:00Z"))
+  assert.equal(week[0].actual, 6.5)
+  assert.equal(week[0].observed_count, 2)
+  const month = prepareForecastChart(source, "month")
+  assert.equal(month.length, 1)
+  assert.equal(month[0].actual, 25/3)
+  assert.equal(JSON.stringify(source), original)
+})
+
+test("bridges stop at twelve hours and daily aggregation preserves outage boundaries", async () => {
+  const {prepareForecastChart} = await import("../src/readings/chart-data.ts")
+  const row = (hour: number) => ({t:new Date(Date.parse("2026-09-24T23:00Z")+hour*3_600_000).toISOString(), actual:6, predicted:7, confidence:null, issued_at:null, model_version:null})
+  for (const hours of [11,12,30]) {
+    const result = prepareForecastChart([row(0),row(hours)])
+    assert.equal(result[1].observation_bridge, hours<12)
+    assert.equal(result.at(-1)!.observed_segment, hours<12?0:1)
+  }
+  const daily = prepareForecastChart([row(0),row(25)], "month")
+  assert.notEqual(daily[0].observed_segment,daily[1].observed_segment)
+  const continuous = prepareForecastChart(Array.from({length:48},(_,i)=>row(i)), "month")
+  assert.equal(continuous[0].observed_segment,continuous[1].observed_segment)
+  const interrupted = prepareForecastChart([row(0),row(18)], "month")
+  assert.equal(interrupted[0].actual,null)
+})
+
+test("day view retains irregular recorded timestamps", async () => {
+  const {prepareForecastChart} = await import("../src/readings/chart-data.ts")
+  const source = ["2026-09-24T23:00Z","2026-09-25T00:07Z"].map(t=>({t,actual:6,predicted:7,confidence:null,issued_at:null,model_version:null}))
+  const data = prepareForecastChart(source)
+  assert.equal(data.filter(p=>p.actual!==null).length,2)
+  assert.equal(data.at(-1)!.t,Date.parse(source[1].t))
+})
